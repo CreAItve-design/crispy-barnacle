@@ -77,7 +77,7 @@ nav a:hover {
         linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)), 
         url('background1.jpg') center/cover no-repeat;
     background-attachment: fixed; /* Creates a smooth parallax scroll */
-    padding: 170px 20px 20px;  /* Increased top padding to clear the larger header */
+    padding: 170px 20px 20px; /* Offset to clear the larger header */
     color: var(--background);
 }
 
@@ -258,7 +258,7 @@ footer {
     }
     
     .logo {
-        height: 90px; /* Increased 50% from 60px */
+        height: 90px; /* Increased 50% for mobile */
     }
     
     nav {
