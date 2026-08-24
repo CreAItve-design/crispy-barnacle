@@ -1,0 +1,21 @@
+{
+  "name": "spotlight-tile",
+  "version": "1.0.0",
+  "description": "Premium scrolling tile installation website with an agentic AI vetting assistant for Spotlight Tile LLC.",
+  "main": "index.html",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "tile",
+    "installation",
+    "spotlight",
+    "ai",
+    "llama3"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "nodemailer": "^9.0.1"
+  }
+}
