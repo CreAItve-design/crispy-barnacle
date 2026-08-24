@@ -3,6 +3,8 @@
     --background: #ffffff;
     --gray-light: #f4f4f4;
     --gray-dark: #333333;
+    /* Define the base body color for smooth edge blending */
+    --body-bg: #fbfbfb; 
 }
 
 * {
@@ -17,13 +19,12 @@ html {
 }
 
 body {
-    background-color: #fbfbfb; /* Fallback color */
-    /* Adds a subtle seamless white marble texture */
-    background-image: linear-gradient(rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.6)), url('background.png'); 
+    background-color: var(--body-bg);
+    /* Lightened the gradient slightly so the marble texture pops without darkening the whole page */
+    background-image: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), url('background.png'); 
     color: var(--primary);
     line-height: 1.6;
 }
-
 
 /* Header & Navigation */
 header {
@@ -34,64 +35,82 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 50px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    padding: 15px 50px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     z-index: 1000;
 }
 
 .logo {
-    height: 114px; /* Adjust based on your image.png proportions */
+    height: 85px; 
     width: auto;
+}
+
+nav {
+    display: flex;
+    gap: 20px;
 }
 
 nav a {
     text-decoration: none;
     color: var(--primary);
-    margin-left: 32px;
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     letter-spacing: 1px;
+    transition: color 0.3s ease;
+}
+
+nav a:hover {
+    color: #666;
 }
 
 /* Hero Section */
 .hero {
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    background: linear-gradient(rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.6)), url('background1.jpg') center/cover;
-    padding: 0 20px;
-    margin-top: 80px;
+    /* Fades the bottom edge of the hero image seamlessly into the body background */
+    background: 
+        linear-gradient(to bottom, rgba(251,251,251,0) 80%, var(--body-bg) 100%),
+        linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7)), 
+        url('background1.jpg') center/cover no-repeat;
+    background-attachment: fixed; /* Creates a smooth parallax scroll */
+    padding: 100px 20px 20px; 
+    color: var(--background);
 }
 
 .hero h1 {
-    font-size: 3.5rem;
+    font-size: 4rem;
     margin-bottom: 20px;
     letter-spacing: 2px;
 }
 
 .hero p {
     font-size: 1.5rem;
-    color: var(--gray-dark);
+    color: #e0e0e0; /* Improved contrast against dark overlay */
     margin-bottom: 30px;
+    max-width: 800px;
 }
 
 .btn {
     display: inline-block;
-    padding: 15px 30px;
-    background: var(--primary);
-    color: var(--background);
+    padding: 15px 35px;
+    background: var(--background);
+    color: var(--primary);
     text-decoration: none;
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 1px;
-    transition: background 0.3s;
+    border-radius: 4px;
+    transition: all 0.3s ease;
 }
 
 .btn:hover {
-    background: var(--gray-dark);
+    background: var(--gray-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 
 /* Portfolio Section */
@@ -107,16 +126,22 @@ nav a {
 
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
     gap: 30px;
     margin-top: 50px;
 }
 
 .card img {
     width: 100%;
-    height: 250px;
+    height: 300px;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.card img:hover {
+    transform: scale(1.03);
 }
 
 .card h3 {
@@ -126,19 +151,29 @@ nav a {
 
 /* Contact / AI Agent Section */
 .contact {
-    background: linear-gradient(rgba(255, 255, 255, 0.6), rgba(0, 0, 0, 0.6)), url('background5.jpg');
-    padding: 100px 50px;
+    /* Fades both top and bottom edges to blend entirely into the body */
+    background: 
+        linear-gradient(to bottom, var(--body-bg) 0%, rgba(251,251,251,0) 15%, rgba(251,251,251,0) 85%, var(--body-bg) 100%),
+        linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8)), 
+        url('background5.jpg') center/cover no-repeat;
+    background-attachment: fixed; /* Parallax effect */
+    padding: 120px 20px;
     text-align: center;
+    color: var(--background);
+}
+
+.contact h2 {
+    margin-bottom: 30px;
+    font-size: 2.5rem;
 }
 
 .chat-container {
     max-width: 600px;
-    margin: 40px auto;
+    margin: 0 auto;
     background: var(--background);
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
 
 .chat-box {
@@ -149,46 +184,59 @@ nav a {
     display: flex;
     flex-direction: column;
     gap: 15px;
+    background: #fdfdfd;
 }
 
 .message {
-    padding: 12px 16px;
-    border-radius: 8px;
-    max-width: 80%;
+    padding: 12px 18px;
+    border-radius: 12px;
+    max-width: 85%;
+    font-size: 0.95rem;
+    line-height: 1.5;
 }
 
 .message.ai {
     background: var(--gray-light);
     align-self: flex-start;
+    color: var(--primary);
+    border-bottom-left-radius: 4px;
 }
 
 .message.user {
     background: var(--primary);
     color: var(--background);
     align-self: flex-end;
+    border-bottom-right-radius: 4px;
 }
 
 .chat-input-area {
     display: flex;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #eee;
+    background: var(--background);
 }
 
 .chat-input-area input {
     flex: 1;
-    padding: 15px;
+    padding: 18px;
     border: none;
     outline: none;
     font-size: 1rem;
+    color: var(--primary);
 }
 
 .chat-input-area button {
-    padding: 0 25px;
+    padding: 0 30px;
     background: var(--primary);
     color: var(--background);
     border: none;
     cursor: pointer;
     font-weight: bold;
     text-transform: uppercase;
+    transition: background 0.3s ease;
+}
+
+.chat-input-area button:hover {
+    background: var(--gray-dark);
 }
 
 footer {
@@ -196,4 +244,78 @@ footer {
     padding: 30px;
     background: var(--primary);
     color: var(--background);
+    font-size: 0.9rem;
+}
+
+/* =========================================
+   MOBILE RESPONSIVENESS (Media Queries)
+   ========================================= */
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        padding: 15px 20px;
+        gap: 15px;
+    }
+    
+    .logo {
+        height: 60px;
+    }
+    
+    nav {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
+    }
+    
+    nav a {
+        font-size: 0.8rem;
+    }
+
+    .hero {
+        padding-top: 130px; /* Offsets for the taller stacked mobile header */
+    }
+
+    .hero h1 {
+        font-size: 2.5rem;
+    }
+
+    .hero p {
+        font-size: 1.1rem;
+        margin-bottom: 20px;
+    }
+
+    .portfolio {
+        padding: 60px 20px;
+    }
+    
+    .portfolio h2 {
+        font-size: 2rem;
+    }
+
+    .grid {
+        margin-top: 30px;
+    }
+
+    .contact {
+        padding: 60px 15px;
+    }
+
+    .contact h2 {
+        font-size: 2rem;
+    }
+
+    .chat-box {
+        height: 350px;
+        padding: 15px;
+    }
+    
+    .chat-input-area input {
+        padding: 15px;
+        font-size: 0.95rem;
+    }
+    
+    .chat-input-area button {
+        padding: 0 20px;
+        font-size: 0.9rem;
+    }
 }
