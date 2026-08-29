@@ -24,8 +24,10 @@
         .action-btn { padding: 6px 12px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; border: none; border-radius: 4px; cursor: pointer; background: #111; color: #fff; }
         .action-btn:hover { background: #333; }
         .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; font-size: 0.85rem; font-weight: 600; text-transform: uppercase; margin-bottom: 5px; color: #444; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        
+        /* Estimate Builder Styles */
+        .builder-box { background: #fafafa; padding: 20px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 30px; }
     </style>
 </head>
 <body class="admin-body">
@@ -34,16 +36,13 @@
     <div id="login-screen" class="login-box">
         <h2 style="margin-bottom: 20px; font-size: 1.5rem;">Admin Portal Login</h2>
         <form onsubmit="handleLogin(event)">
-            <div class="form-group" style="text-align: left;">
-                <label>Admin Password</label>
-                <input type="password" id="admin-pass" required placeholder="Enter password...">
-            </div>
-            <button type="submit" class="action-btn" style="width: 100%; padding: 12px; margin-top: 10px;">Access Portal</button>
+            <div class="form-group"><input type="password" id="admin-pass" required placeholder="Enter password..."></div>
+            <button type="submit" class="action-btn" style="width: 100%; padding: 12px;">Access Portal</button>
             <p id="login-error" style="color: #c62828; font-size: 0.85rem; margin-top: 10px;"></p>
         </form>
     </div>
 
-    <!-- MAIN ADMIN DASHBOARD (Hidden until logged in) -->
+    <!-- MAIN DASHBOARD -->
     <div id="dashboard-screen" class="admin-container" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h1 style="font-size: 2rem;">Spotlight Tile Management</h1>
@@ -60,45 +59,58 @@
         <!-- TAB 1: P&L SUMMARY -->
         <div id="tab-pnl" class="tab-content active">
             <h2>Financial Performance (Profit & Loss)</h2>
-            <p style="color: #666; margin-bottom: 25px; font-size: 0.95rem;">Real-time balance calculations based on recorded paid invoices and manual expenses.</p>
-            
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3>Total Revenue (Paid)</h3>
-                    <p id="pnl-revenue">$0.00</p>
-                </div>
-                <div class="stat-card">
-                    <h3>Total Expenses</h3>
-                    <p id="pnl-expenses">$0.00</p>
-                </div>
-                <div class="stat-card" style="border-color: #111;">
-                    <h3>Net Operating Profit</h3>
-                    <p id="pnl-net" style="color: #2e7d32;">$0.00</p>
-                </div>
+            <div class="stats-grid" style="margin-top:20px;">
+                <div class="stat-card"><h3>Total Revenue (Paid)</h3><p id="pnl-revenue">$0.00</p></div>
+                <div class="stat-card"><h3>Total Expenses</h3><p id="pnl-expenses">$0.00</p></div>
+                <div class="stat-card" style="border-color: #111;"><h3>Net Operating Profit</h3><p id="pnl-net" style="color: #2e7d32;">$0.00</p></div>
             </div>
-
             <h3 style="margin-top: 30px; margin-bottom: 15px;">Expenses by Category</h3>
-            <div id="expense-breakdown" style="font-size: 1rem; color: #444;">
-                <p>Loading breakdown...</p>
-            </div>
+            <div id="expense-breakdown">Loading...</div>
         </div>
 
         <!-- TAB 2: ESTIMATES & INVOICES -->
         <div id="tab-estimates" class="tab-content">
-            <h2>Active Bids & Client Invoices</h2>
-            <p style="color: #666; margin-bottom: 20px;">Convert accepted estimates into active invoices with a single click.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Active Bids & Client Invoices</h2>
+                <button class="action-btn" onclick="document.getElementById('estimate-builder').style.display='block'">+ Create New Estimate</button>
+            </div>
+
+            <!-- NEW ESTIMATE BUILDER -->
+            <div id="estimate-builder" class="builder-box" style="display: none;">
+                <h3 style="margin-bottom: 15px;">Build a New Bid</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="b-name" placeholder="Client Name" style="flex:1; padding:8px;" required>
+                    <input type="email" id="b-email" placeholder="Client Email" style="flex:1; padding:8px;">
+                    <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">
+                    <select id="b-item-select" style="flex:2; padding:8px;">
+                        <option value="">-- Select Material / Labor --</option>
+                    </select>
+                    <input type="number" id="b-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
+                    <button class="action-btn" onclick="addLineItem()">Add Line</button>
+                </div>
+
+                <table style="margin-bottom: 15px;">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Unit Price</th><th>Line Total</th></tr></thead>
+                    <tbody id="b-lines"></tbody>
+                </table>
+                <h2 style="text-align: right; margin-bottom: 20px;">Total: $<span id="b-total">0.00</span></h2>
+
+                <div style="text-align: right;">
+                    <button class="action-btn" style="background: #666;" onclick="document.getElementById('estimate-builder').style.display='none'">Cancel</button>
+                    <button class="action-btn" style="background: #2e7d32; margin-left: 10px;" onclick="saveEstimate()">Save Estimate</button>
+                </div>
+                <p id="b-msg" style="text-align: right; margin-top: 10px;"></p>
+            </div>
+
             <table>
                 <thead>
-                    <tr>
-                        <th>Client</th>
-                        <th>Project</th>
-                        <th>Total</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
+                    <tr><th>Client</th><th>Project</th><th>Status</th><th>Total</th></tr>
                 </thead>
                 <tbody id="estimates-table-body">
-                    <tr><td colspan="5" style="text-align: center;">Loading records...</td></tr>
+                    <tr><td colspan="4">Loading records...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -106,18 +118,10 @@
         <!-- TAB 3: PRICE SHEET -->
         <div id="tab-prices" class="tab-content">
             <h2>Itemized Price Sheet</h2>
-            <p style="color: #666; margin-bottom: 20px;">Standard material and labor rates used when compiling client quotes.</p>
             <table>
-                <thead>
-                    <tr>
-                        <th>Item Name</th>
-                        <th>Category</th>
-                        <th>Unit</th>
-                        <th>Rate ($)</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Item Name</th><th>Category</th><th>Unit</th><th>Rate ($)</th></tr></thead>
                 <tbody id="prices-table-body">
-                    <tr><td colspan="4" style="text-align: center;">Loading price sheet...</td></tr>
+                    <tr><td colspan="4">Loading price sheet...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -127,61 +131,42 @@
             <h2>Record a Business Expense</h2>
             <form onsubmit="submitExpense(event)" style="max-width: 500px;">
                 <div class="form-group">
-                    <label>Category</label>
                     <select id="exp-category" required>
-                        <option value="Materials">Materials (Tile, Thin-set, Backer board)</option>
+                        <option value="Materials">Materials</option>
                         <option value="Tools & Equipment">Tools & Equipment</option>
                         <option value="Vehicle / Fuel">Vehicle & Gas</option>
                         <option value="Subcontractors">Subcontractors</option>
-                        <option value="Other Overhead">Other Overhead</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Amount ($)</label>
-                    <input type="number" step="0.01" id="exp-amount" required placeholder="150.00">
-                </div>
-                <div class="form-group">
-                    <label>Description / Vendor</label>
-                    <textarea id="exp-desc" rows="3" placeholder="e.g., Home Depot - waterproofing rolls"></textarea>
-                </div>
+                <div class="form-group"><input type="number" step="0.01" id="exp-amount" required placeholder="Amount ($)"></div>
+                <div class="form-group"><textarea id="exp-desc" rows="3" placeholder="Description..."></textarea></div>
                 <button type="submit" class="action-btn" style="padding: 12px 25px;">Save Expense</button>
-                <p id="exp-msg" style="margin-top: 10px; font-size: 0.9rem; font-weight: 500;"></p>
+                <p id="exp-msg" style="margin-top: 10px;"></p>
             </form>
         </div>
     </div>
 
     <script>
+        let globalPrices = [];
+        let draftLines = [];
+        let draftTotal = 0;
+
         async function handleLogin(e) {
             e.preventDefault();
             const pass = document.getElementById('admin-pass').value;
-            const errorTag = document.getElementById('login-error');
-            
-            try {
-                const res = await fetch('/.netlify/functions/admin-auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password: pass })
-                });
-
-                if (res.ok) {
-                    sessionStorage.setItem('spotlight_admin', 'true');
-                    document.getElementById('login-screen').style.display = 'none';
-                    document.getElementById('dashboard-screen').style.display = 'block';
-                    loadDashboardData();
-                } else {
-                    errorTag.innerText = 'Incorrect password.';
-                }
-            } catch (err) {
-                errorTag.innerText = 'Connection error. Please try again.';
+            const res = await fetch('/.netlify/functions/admin-auth', {
+                method: 'POST', body: JSON.stringify({ password: pass })
+            });
+            if (res.ok) {
+                sessionStorage.setItem('spotlight_admin', 'true');
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard-screen').style.display = 'block';
+                loadDashboardData();
+            } else {
+                document.getElementById('login-error').innerText = 'Incorrect password.';
             }
         }
 
-        function logout() {
-            sessionStorage.removeItem('spotlight_admin');
-            location.reload();
-        }
-
-        // Check active session on load
         window.onload = () => {
             if (sessionStorage.getItem('spotlight_admin') === 'true') {
                 document.getElementById('login-screen').style.display = 'none';
@@ -189,6 +174,11 @@
                 loadDashboardData();
             }
         };
+
+        function logout() {
+            sessionStorage.removeItem('spotlight_admin');
+            location.reload();
+        }
 
         function switchTab(evt, tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -199,23 +189,97 @@
 
         async function loadDashboardData() {
             try {
-                // Load P&L Stats
+                // 1. Load P&L
                 const pnlRes = await fetch('/.netlify/functions/reports-pnl');
                 const pnlData = await pnlRes.json();
-                
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
                 document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
                 document.getElementById('pnl-net').innerText = `$${pnlData.netProfit.toFixed(2)}`;
-
+                
                 let breakdownHtml = '<ul>';
                 for (const [cat, amt] of Object.entries(pnlData.expensesByCategory || {})) {
                     breakdownHtml += `<li><strong>${cat}:</strong> $${Number(amt).toFixed(2)}</li>`;
                 }
-                breakdownHtml += '</ul>';
-                document.getElementById('expense-breakdown').innerHTML = breakdownHtml || 'No expenses logged yet.';
+                document.getElementById('expense-breakdown').innerHTML = breakdownHtml + '</ul>';
+
+                // 2. Load Prices
+                const priceRes = await fetch('/.netlify/functions/get-prices');
+                globalPrices = await priceRes.json();
                 
+                const priceBody = document.getElementById('prices-table-body');
+                const dropdown = document.getElementById('b-item-select');
+                priceBody.innerHTML = '';
+                
+                globalPrices.forEach(item => {
+                    priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price}</td></tr>`;
+                    dropdown.innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
+                });
+
+                // 3. Load Estimates
+                const estRes = await fetch('/.netlify/functions/get-estimates');
+                const estimates = await estRes.json();
+                const estBody = document.getElementById('estimates-table-body');
+                estBody.innerHTML = '';
+                
+                estimates.forEach(est => {
+                    estBody.innerHTML += `<tr>
+                        <td><strong>${est.client_name}</strong><br><small>${est.client_email}</small></td>
+                        <td>${est.project_type}</td>
+                        <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
+                        <td>$${est.total_amount}</td>
+                    </tr>`;
+                });
+
             } catch (err) {
-                console.error("Failed to load dashboard metrics", err);
+                console.error("Dashboard Load Error", err);
+            }
+        }
+
+        function addLineItem() {
+            const selectId = document.getElementById('b-item-select').value;
+            const qty = parseFloat(document.getElementById('b-qty').value);
+            
+            if (!selectId || !qty || qty <= 0) return;
+
+            const item = globalPrices.find(p => p.id == selectId);
+            const lineTotal = item.unit_price * qty;
+            
+            draftLines.push({ item_name: item.item_name, qty, unit_price: item.unit_price, line_total: lineTotal });
+            draftTotal += lineTotal;
+
+            document.getElementById('b-lines').innerHTML += `<tr><td>${item.item_name}</td><td>${qty}</td><td>$${item.unit_price}</td><td>$${lineTotal.toFixed(2)}</td></tr>`;
+            document.getElementById('b-total').innerText = draftTotal.toFixed(2);
+        }
+
+        async function saveEstimate() {
+            const client_name = document.getElementById('b-name').value;
+            const client_email = document.getElementById('b-email').value;
+            const project_type = document.getElementById('b-project').value;
+            const msg = document.getElementById('b-msg');
+
+            if (!client_name || draftLines.length === 0) {
+                msg.style.color = 'red';
+                msg.innerText = 'Name and at least one line item required.';
+                return;
+            }
+
+            try {
+                const res = await fetch('/.netlify/functions/create-estimate', {
+                    method: 'POST',
+                    body: JSON.stringify({ client_name, client_email, project_type, itemized_lines: draftLines, total_amount: draftTotal })
+                });
+
+                if (res.ok) {
+                    document.getElementById('estimate-builder').style.display = 'none';
+                    draftLines = []; draftTotal = 0;
+                    document.getElementById('b-lines').innerHTML = '';
+                    document.getElementById('b-total').innerText = '0.00';
+                    document.getElementById('b-name').value = '';
+                    loadDashboardData(); // Refresh the table
+                }
+            } catch (err) {
+                msg.style.color = 'red';
+                msg.innerText = 'Failed to save.';
             }
         }
 
@@ -224,28 +288,13 @@
             const category = document.getElementById('exp-category').value;
             const amount = document.getElementById('exp-amount').value;
             const description = document.getElementById('exp-desc').value;
-            const msg = document.getElementById('exp-msg');
-
-            try {
-                const res = await fetch('/.netlify/functions/manage-expenses', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category, amount, description })
-                });
-
-                if (res.ok) {
-                    msg.style.color = '#2e7d32';
-                    msg.innerText = 'Expense successfully recorded!';
-                    document.getElementById('exp-amount').value = '';
-                    document.getElementById('exp-desc').value = '';
-                    loadDashboardData();
-                } else {
-                    throw new Error();
-                }
-            } catch (err) {
-                msg.style.color = '#c62828';
-                msg.innerText = 'Failed to save expense.';
-            }
+            
+            await fetch('/.netlify/functions/manage-expenses', {
+                method: 'POST', body: JSON.stringify({ category, amount, description })
+            });
+            document.getElementById('exp-amount').value = '';
+            document.getElementById('exp-desc').value = '';
+            loadDashboardData();
         }
     </script>
 </body>
