@@ -1,10 +1,15 @@
-const { createClient } = require('@supabase/supabase-js');
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-
 exports.handler = async () => {
+    if (!process.env.SUPABASE_URL) return { statusCode: 500, body: JSON.stringify({ error: 'Missing URL Env Var' }) };
+    const baseUrl = process.env.SUPABASE_URL.replace(/\/$/, '');
+    
     try {
-        const { data } = await supabase.from('clients').select('*').order('name');
-        return { statusCode: 200, body: JSON.stringify(data || []) };
+        const res = await fetch(`${baseUrl}/rest/v1/clients?select=*&order=name.asc`, {
+            headers: {
+                'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+                'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+            }
+        });
+        return { statusCode: 200, body: JSON.stringify(await res.json()) };
     } catch (error) {
         return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
     }
