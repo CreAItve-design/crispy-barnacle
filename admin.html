@@ -18,15 +18,13 @@
         .stat-card { background: #fdfdfd; border: 1px solid #e5e5e5; padding: 20px; border-radius: 6px; text-align: center; }
         .stat-card h3 { font-size: 0.85rem; color: #666; text-transform: uppercase; margin-bottom: 8px; }
         .stat-card p { font-size: 1.8rem; font-weight: 700; color: #111; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; }
         th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #e5e5e5; font-size: 0.95rem; }
         th { background: #fafafa; font-weight: 600; text-transform: uppercase; font-size: 0.8rem; color: #555; }
         .action-btn { padding: 6px 12px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; border: none; border-radius: 4px; cursor: pointer; background: #111; color: #fff; }
         .action-btn:hover { background: #333; }
         .form-group { margin-bottom: 15px; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
-        
-        /* Estimate Builder Styles */
         .builder-box { background: #fafafa; padding: 20px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 30px; }
     </style>
 </head>
@@ -71,17 +69,30 @@
         <!-- TAB 2: ESTIMATES & INVOICES -->
         <div id="tab-estimates" class="tab-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>Active Bids & Client Invoices</h2>
-                <button class="action-btn" onclick="document.getElementById('estimate-builder').style.display='block'">+ Create New Estimate</button>
+                <h2>Active Documents</h2>
+                <button class="action-btn" onclick="document.getElementById('builder-box').style.display='block'">+ Create Document</button>
             </div>
 
-            <!-- NEW ESTIMATE BUILDER -->
-            <div id="estimate-builder" class="builder-box" style="display: none;">
-                <h3 style="margin-bottom: 15px;">Build a New Bid</h3>
+            <!-- BUILDER -->
+            <div id="builder-box" class="builder-box" style="display: none;">
+                <h3 style="margin-bottom: 15px;">Build a New Document</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="margin-right: 20px; font-weight:bold;"><input type="radio" name="doc_type" value="Estimate" checked onchange="toggleDeposit(this.value)"> Create Estimate</label>
+                    <label style="font-weight:bold;"><input type="radio" name="doc_type" value="Invoice" onchange="toggleDeposit(this.value)"> Create Direct Invoice</label>
+                </div>
+
+                <datalist id="saved-clients"></datalist>
+                
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="b-name" placeholder="Client Name" style="flex:1; padding:8px;" required>
+                    <input type="text" id="b-name" list="saved-clients" placeholder="Client Name" style="flex:1; padding:8px;" required autocomplete="off">
                     <input type="email" id="b-email" placeholder="Client Email" style="flex:1; padding:8px;">
                     <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
+                </div>
+                
+                <div id="deposit-container" style="display: none; margin-bottom: 15px; align-items: center; gap: 10px;">
+                    <label style="font-weight: bold;">Initial Deposit Paid: $</label>
+                    <input type="number" id="b-deposit" value="0" step="0.01" style="padding:8px; width: 120px;">
                 </div>
                 
                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">
@@ -99,19 +110,22 @@
                 <h2 style="text-align: right; margin-bottom: 20px;">Total: $<span id="b-total">0.00</span></h2>
 
                 <div style="text-align: right;">
-                    <button class="action-btn" style="background: #666;" onclick="document.getElementById('estimate-builder').style.display='none'">Cancel</button>
-                    <button class="action-btn" style="background: #2e7d32; margin-left: 10px;" onclick="saveEstimate()">Save Estimate</button>
+                    <button class="action-btn" style="background: #666;" onclick="document.getElementById('builder-box').style.display='none'">Cancel</button>
+                    <button class="action-btn" style="background: #2e7d32; margin-left: 10px;" onclick="saveDocument()">Save Document</button>
                 </div>
                 <p id="b-msg" style="text-align: right; margin-top: 10px;"></p>
             </div>
 
+            <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px;">Issued Invoices</h3>
             <table>
-                <thead>
-                    <tr><th>Client</th><th>Project</th><th>Status</th><th>Total</th></tr>
-                </thead>
-                <tbody id="estimates-table-body">
-                    <tr><td colspan="4">Loading records...</td></tr>
-                </tbody>
+                <thead><tr><th>Client</th><th>Total & Deposit</th><th>Balance Due</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="invoices-table-body"><tr><td colspan="5">Loading records...</td></tr></tbody>
+            </table>
+
+            <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px;">Draft Estimates</h3>
+            <table>
+                <thead><tr><th>Client</th><th>Project</th><th>Status</th><th>Total</th></tr></thead>
+                <tbody id="estimates-table-body"><tr><td colspan="4">Loading records...</td></tr></tbody>
             </table>
         </div>
 
@@ -148,6 +162,7 @@
 
     <script>
         let globalPrices = [];
+        let globalClients = [];
         let draftLines = [];
         let draftTotal = 0;
 
@@ -187,9 +202,19 @@
             evt.currentTarget.classList.add('active');
         }
 
+        function toggleDeposit(type) {
+            document.getElementById('deposit-container').style.display = type === 'Invoice' ? 'flex' : 'none';
+        }
+
+        // Auto-fill client email from memory
+        document.getElementById('b-name').addEventListener('input', function(e) {
+            const selected = globalClients.find(c => c.name === e.target.value);
+            if (selected) document.getElementById('b-email').value = selected.email || '';
+        });
+
         async function loadDashboardData() {
             try {
-                // 1. Load P&L
+                // Load P&L
                 const pnlRes = await fetch('/.netlify/functions/reports-pnl');
                 const pnlData = await pnlRes.json();
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
@@ -202,29 +227,54 @@
                 }
                 document.getElementById('expense-breakdown').innerHTML = breakdownHtml + '</ul>';
 
-                // 2. Load Prices
+                // Load Clients
+                const clientRes = await fetch('/.netlify/functions/get-clients');
+                globalClients = await clientRes.json();
+                const datalist = document.getElementById('saved-clients');
+                datalist.innerHTML = '';
+                globalClients.forEach(c => datalist.innerHTML += `<option value="${c.name}">`);
+
+                // Load Prices
                 const priceRes = await fetch('/.netlify/functions/get-prices');
                 globalPrices = await priceRes.json();
-                
                 const priceBody = document.getElementById('prices-table-body');
                 const dropdown = document.getElementById('b-item-select');
-                priceBody.innerHTML = '';
+                priceBody.innerHTML = ''; dropdown.innerHTML = '<option value="">-- Select Material / Labor --</option>';
                 
                 globalPrices.forEach(item => {
                     priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price}</td></tr>`;
                     dropdown.innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
                 });
 
-                // 3. Load Estimates
+                // Load Invoices
+                const invRes = await fetch('/.netlify/functions/manage-invoices');
+                const invoices = await invRes.json();
+                const invBody = document.getElementById('invoices-table-body');
+                invBody.innerHTML = '';
+                invoices.forEach(inv => {
+                    const balance = inv.total_amount - (inv.deposit_paid || 0);
+                    const actionBtn = inv.status === 'Unpaid' 
+                        ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32;">Mark Paid</button>` 
+                        : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
+                    
+                    invBody.innerHTML += `<tr>
+                        <td><strong>${inv.client_name}</strong><br><small>${inv.client_email}</small></td>
+                        <td>Total: $${inv.total_amount}<br><small style="color:#666;">Deposit: $${inv.deposit_paid || 0}</small></td>
+                        <td style="font-size:1.1rem; font-weight:bold;">$${balance.toFixed(2)}</td>
+                        <td>${inv.status}</td>
+                        <td>${actionBtn}</td>
+                    </tr>`;
+                });
+
+                // Load Estimates
                 const estRes = await fetch('/.netlify/functions/get-estimates');
                 const estimates = await estRes.json();
                 const estBody = document.getElementById('estimates-table-body');
                 estBody.innerHTML = '';
-                
                 estimates.forEach(est => {
                     estBody.innerHTML += `<tr>
                         <td><strong>${est.client_name}</strong><br><small>${est.client_email}</small></td>
-                        <td>${est.project_type}</td>
+                        <td>${est.project_type || 'N/A'}</td>
                         <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
                         <td>$${est.total_amount}</td>
                     </tr>`;
@@ -251,36 +301,50 @@
             document.getElementById('b-total').innerText = draftTotal.toFixed(2);
         }
 
-        async function saveEstimate() {
+        async function saveDocument() {
+            const docType = document.querySelector('input[name="doc_type"]:checked').value;
             const client_name = document.getElementById('b-name').value;
             const client_email = document.getElementById('b-email').value;
             const project_type = document.getElementById('b-project').value;
+            const deposit_paid = document.getElementById('b-deposit').value;
             const msg = document.getElementById('b-msg');
 
             if (!client_name || draftLines.length === 0) {
-                msg.style.color = 'red';
-                msg.innerText = 'Name and at least one line item required.';
+                msg.style.color = 'red'; msg.innerText = 'Name and at least one line item required.';
                 return;
             }
 
+            const endpoint = docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices';
+
             try {
-                const res = await fetch('/.netlify/functions/create-estimate', {
+                const res = await fetch(endpoint, {
                     method: 'POST',
-                    body: JSON.stringify({ client_name, client_email, project_type, itemized_lines: draftLines, total_amount: draftTotal })
+                    body: JSON.stringify({ 
+                        client_name, client_email, project_type, 
+                        deposit_paid: parseFloat(deposit_paid || 0), 
+                        itemized_lines: draftLines, total_amount: draftTotal 
+                    })
                 });
 
                 if (res.ok) {
-                    document.getElementById('estimate-builder').style.display = 'none';
+                    document.getElementById('builder-box').style.display = 'none';
                     draftLines = []; draftTotal = 0;
                     document.getElementById('b-lines').innerHTML = '';
                     document.getElementById('b-total').innerText = '0.00';
                     document.getElementById('b-name').value = '';
-                    loadDashboardData(); // Refresh the table
+                    document.getElementById('b-deposit').value = '0';
+                    loadDashboardData(); 
                 }
             } catch (err) {
-                msg.style.color = 'red';
-                msg.innerText = 'Failed to save.';
+                msg.style.color = 'red'; msg.innerText = 'Failed to save.';
             }
+        }
+
+        async function markInvoicePaid(id) {
+            await fetch('/.netlify/functions/manage-invoices', {
+                method: 'PUT', body: JSON.stringify({ id, status: 'Paid' })
+            });
+            loadDashboardData();
         }
 
         async function submitExpense(e) {
