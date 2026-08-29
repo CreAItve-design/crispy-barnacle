@@ -11,11 +11,17 @@ exports.handler = async (event) => {
     
     if (method === 'POST') {
         const payload = JSON.parse(event.body);
-        await supabase.from('clients').upsert([{ name: payload.client_name, email: payload.client_email }], { onConflict: 'name' });
+        
+        // Auto-save client if they don't exist
+        if (payload.client_name) {
+            await supabase.from('clients').upsert([{ name: payload.client_name, email: payload.client_email }], { onConflict: 'name' });
+        }
         
         await supabase.from('invoices').insert([{
             client_name: payload.client_name,
             client_email: payload.client_email,
+            client_phone: payload.client_phone,
+            po_job_name: payload.po_job_name,
             itemized_lines: payload.itemized_lines,
             total_amount: payload.total_amount,
             deposit_paid: payload.deposit_paid || 0,

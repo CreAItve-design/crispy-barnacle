@@ -84,10 +84,17 @@
 
                 <datalist id="saved-clients"></datalist>
                 
+                <!-- Client Info Row -->
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="b-name" list="saved-clients" placeholder="Client Name" style="flex:1; padding:8px;" required autocomplete="off">
-                    <input type="email" id="b-email" placeholder="Client Email" style="flex:1; padding:8px;">
-                    <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
+                    <input type="text" id="b-name" list="saved-clients" placeholder="Client Name *" style="flex:1; padding:8px;" required autocomplete="off">
+                    <input type="email" id="b-email" placeholder="Email Address" style="flex:1; padding:8px;">
+                    <input type="tel" id="b-phone" placeholder="Phone Number" style="flex:1; padding:8px;">
+                </div>
+
+                <!-- Job Info Row -->
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="b-project" placeholder="Project Type (e.g., Master Bath)" style="flex:1; padding:8px;">
+                    <input type="text" id="b-po" placeholder="PO / Job Name" style="flex:1; padding:8px;">
                 </div>
                 
                 <div id="deposit-container" style="display: none; margin-bottom: 15px; align-items: center; gap: 10px;">
@@ -118,14 +125,14 @@
 
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px;">Issued Invoices</h3>
             <table>
-                <thead><tr><th>Client</th><th>Total & Deposit</th><th>Balance Due</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody id="invoices-table-body"><tr><td colspan="5">Loading records...</td></tr></tbody>
+                <thead><tr><th>Document #</th><th>Client / PO</th><th>Total & Deposit</th><th>Balance Due</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="invoices-table-body"><tr><td colspan="6">Loading records...</td></tr></tbody>
             </table>
 
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px;">Draft Estimates</h3>
             <table>
-                <thead><tr><th>Client</th><th>Project</th><th>Status</th><th>Total</th></tr></thead>
-                <tbody id="estimates-table-body"><tr><td colspan="4">Loading records...</td></tr></tbody>
+                <thead><tr><th>Estimate #</th><th>Client / PO</th><th>Project</th><th>Status</th><th>Total</th></tr></thead>
+                <tbody id="estimates-table-body"><tr><td colspan="5">Loading records...</td></tr></tbody>
             </table>
         </div>
 
@@ -206,97 +213,112 @@
             document.getElementById('deposit-container').style.display = type === 'Invoice' ? 'flex' : 'none';
         }
 
-        // Auto-fill client email from memory
+        // Auto-fill client email from memory if they exist
         document.getElementById('b-name').addEventListener('input', function(e) {
             const selected = globalClients.find(c => c.name === e.target.value);
-            if (selected) document.getElementById('b-email').value = selected.email || '';
+            if (selected) {
+                document.getElementById('b-email').value = selected.email || '';
+            }
         });
 
         async function loadDashboardData() {
+            // Isolate each fetch so a failure in one doesn't break the page
+            
+            // 1. Load P&L
             try {
-                // Load P&L
                 const pnlRes = await fetch('/.netlify/functions/reports-pnl');
-                const pnlData = await pnlRes.json();
-                document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
-                document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
-                document.getElementById('pnl-net').innerText = `$${pnlData.netProfit.toFixed(2)}`;
-                
-                let breakdownHtml = '<ul>';
-                for (const [cat, amt] of Object.entries(pnlData.expensesByCategory || {})) {
-                    breakdownHtml += `<li><strong>${cat}:</strong> $${Number(amt).toFixed(2)}</li>`;
+                if (pnlRes.ok) {
+                    const pnlData = await pnlRes.json();
+                    document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
+                    document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
+                    document.getElementById('pnl-net').innerText = `$${pnlData.netProfit.toFixed(2)}`;
+                    let breakdownHtml = '<ul>';
+                    for (const [cat, amt] of Object.entries(pnlData.expensesByCategory || {})) {
+                        breakdownHtml += `<li><strong>${cat}:</strong> $${Number(amt).toFixed(2)}</li>`;
+                    }
+                    document.getElementById('expense-breakdown').innerHTML = breakdownHtml + '</ul>';
                 }
-                document.getElementById('expense-breakdown').innerHTML = breakdownHtml + '</ul>';
+            } catch(e) { console.warn("P&L Load Error", e); }
 
-                // Load Clients
+            // 2. Load Clients (Safe Fetch)
+            try {
                 const clientRes = await fetch('/.netlify/functions/get-clients');
-                globalClients = await clientRes.json();
-                const datalist = document.getElementById('saved-clients');
-                datalist.innerHTML = '';
-                globalClients.forEach(c => datalist.innerHTML += `<option value="${c.name}">`);
+                if (clientRes.ok) {
+                    globalClients = await clientRes.json();
+                    const datalist = document.getElementById('saved-clients');
+                    datalist.innerHTML = '';
+                    globalClients.forEach(c => datalist.innerHTML += `<option value="${c.name}">`);
+                }
+            } catch(e) { console.warn("Clients Load Error", e); }
 
-                // Load Prices
+            // 3. Load Prices (Safe Fetch)
+            try {
                 const priceRes = await fetch('/.netlify/functions/get-prices');
-                globalPrices = await priceRes.json();
-                const priceBody = document.getElementById('prices-table-body');
-                const dropdown = document.getElementById('b-item-select');
-                priceBody.innerHTML = ''; dropdown.innerHTML = '<option value="">-- Select Material / Labor --</option>';
-                
-                globalPrices.forEach(item => {
-                    priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price}</td></tr>`;
-                    dropdown.innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
-                });
+                if (priceRes.ok) {
+                    globalPrices = await priceRes.json();
+                    const priceBody = document.getElementById('prices-table-body');
+                    const dropdown = document.getElementById('b-item-select');
+                    priceBody.innerHTML = ''; dropdown.innerHTML = '<option value="">-- Select Material / Labor --</option>';
+                    globalPrices.forEach(item => {
+                        priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price}</td></tr>`;
+                        dropdown.innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
+                    });
+                }
+            } catch(e) { console.warn("Prices Load Error", e); }
 
-                // Load Invoices
+            // 4. Load Invoices (Safe Fetch)
+            try {
                 const invRes = await fetch('/.netlify/functions/manage-invoices');
-                const invoices = await invRes.json();
-                const invBody = document.getElementById('invoices-table-body');
-                invBody.innerHTML = '';
-                invoices.forEach(inv => {
-                    const balance = inv.total_amount - (inv.deposit_paid || 0);
-                    const actionBtn = inv.status === 'Unpaid' 
-                        ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32;">Mark Paid</button>` 
-                        : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
-                    
-                    invBody.innerHTML += `<tr>
-                        <td><strong>${inv.client_name}</strong><br><small>${inv.client_email}</small></td>
-                        <td>Total: $${inv.total_amount}<br><small style="color:#666;">Deposit: $${inv.deposit_paid || 0}</small></td>
-                        <td style="font-size:1.1rem; font-weight:bold;">$${balance.toFixed(2)}</td>
-                        <td>${inv.status}</td>
-                        <td>${actionBtn}</td>
-                    </tr>`;
-                });
+                if (invRes.ok) {
+                    const invoices = await invRes.json();
+                    const invBody = document.getElementById('invoices-table-body');
+                    invBody.innerHTML = '';
+                    invoices.forEach(inv => {
+                        const balance = inv.total_amount - (inv.deposit_paid || 0);
+                        const actionBtn = inv.status === 'Unpaid' 
+                            ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32;">Mark Paid</button>` 
+                            : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
+                        
+                        invBody.innerHTML += `<tr>
+                            <td><strong>Invoice #${inv.id}</strong></td>
+                            <td><strong>${inv.client_name}</strong><br><small>${inv.po_job_name || 'N/A'}</small></td>
+                            <td>Total: $${inv.total_amount}<br><small style="color:#666;">Deposit: $${inv.deposit_paid || 0}</small></td>
+                            <td style="font-size:1.1rem; font-weight:bold;">$${balance.toFixed(2)}</td>
+                            <td>${inv.status}</td>
+                            <td>${actionBtn}</td>
+                        </tr>`;
+                    });
+                }
+            } catch(e) { console.warn("Invoices Load Error", e); }
 
-                // Load Estimates
+            // 5. Load Estimates (Safe Fetch)
+            try {
                 const estRes = await fetch('/.netlify/functions/get-estimates');
-                const estimates = await estRes.json();
-                const estBody = document.getElementById('estimates-table-body');
-                estBody.innerHTML = '';
-                estimates.forEach(est => {
-                    estBody.innerHTML += `<tr>
-                        <td><strong>${est.client_name}</strong><br><small>${est.client_email}</small></td>
-                        <td>${est.project_type || 'N/A'}</td>
-                        <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
-                        <td>$${est.total_amount}</td>
-                    </tr>`;
-                });
-
-            } catch (err) {
-                console.error("Dashboard Load Error", err);
-            }
+                if (estRes.ok) {
+                    const estimates = await estRes.json();
+                    const estBody = document.getElementById('estimates-table-body');
+                    estBody.innerHTML = '';
+                    estimates.forEach(est => {
+                        estBody.innerHTML += `<tr>
+                            <td><strong>Estimate #${est.id}</strong></td>
+                            <td><strong>${est.client_name}</strong><br><small>${est.po_job_name || 'N/A'}</small></td>
+                            <td>${est.project_type || 'N/A'}</td>
+                            <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
+                            <td>$${est.total_amount}</td>
+                        </tr>`;
+                    });
+                }
+            } catch(e) { console.warn("Estimates Load Error", e); }
         }
 
         function addLineItem() {
             const selectId = document.getElementById('b-item-select').value;
             const qty = parseFloat(document.getElementById('b-qty').value);
-            
             if (!selectId || !qty || qty <= 0) return;
-
             const item = globalPrices.find(p => p.id == selectId);
             const lineTotal = item.unit_price * qty;
-            
             draftLines.push({ item_name: item.item_name, qty, unit_price: item.unit_price, line_total: lineTotal });
             draftTotal += lineTotal;
-
             document.getElementById('b-lines').innerHTML += `<tr><td>${item.item_name}</td><td>${qty}</td><td>$${item.unit_price}</td><td>$${lineTotal.toFixed(2)}</td></tr>`;
             document.getElementById('b-total').innerText = draftTotal.toFixed(2);
         }
@@ -305,7 +327,9 @@
             const docType = document.querySelector('input[name="doc_type"]:checked').value;
             const client_name = document.getElementById('b-name').value;
             const client_email = document.getElementById('b-email').value;
+            const client_phone = document.getElementById('b-phone').value;
             const project_type = document.getElementById('b-project').value;
+            const po_job_name = document.getElementById('b-po').value;
             const deposit_paid = document.getElementById('b-deposit').value;
             const msg = document.getElementById('b-msg');
 
@@ -320,7 +344,7 @@
                 const res = await fetch(endpoint, {
                     method: 'POST',
                     body: JSON.stringify({ 
-                        client_name, client_email, project_type, 
+                        client_name, client_email, client_phone, po_job_name, project_type, 
                         deposit_paid: parseFloat(deposit_paid || 0), 
                         itemized_lines: draftLines, total_amount: draftTotal 
                     })
@@ -332,6 +356,8 @@
                     document.getElementById('b-lines').innerHTML = '';
                     document.getElementById('b-total').innerText = '0.00';
                     document.getElementById('b-name').value = '';
+                    document.getElementById('b-phone').value = '';
+                    document.getElementById('b-po').value = '';
                     document.getElementById('b-deposit').value = '0';
                     loadDashboardData(); 
                 }
