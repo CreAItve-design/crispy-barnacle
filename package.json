@@ -13,10 +13,18 @@
     "ai",
     "llama3"
   ],
-  "author": "",
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
     "nodemailer": "^9.0.1"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CreAItve-design/crispy-barnacle.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/CreAItve-design/crispy-barnacle/issues"
+  },
+  "homepage": "https://github.com/CreAItve-design/crispy-barnacle#readme"
 }
