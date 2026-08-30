@@ -182,8 +182,6 @@
     let globalEstimates = [];
     let draftLines = [];
     let draftTotal = 0;
-    
-    // Tracking if we are editing
     let editingDocId = null;
     let editingDocType = null;
 
@@ -224,7 +222,6 @@
     });
 
     async function loadDashboardData() {
-        // Load Prices
         try {
             const priceRes = await fetch('/.netlify/functions/get-prices');
             const priceBody = document.getElementById('prices-table-body');
@@ -239,7 +236,6 @@
             });
         } catch(e) {}
 
-        // Load Clients & P&L
         try {
             const clientRes = await fetch('/.netlify/functions/get-clients');
             if (clientRes.ok) {
@@ -252,7 +248,6 @@
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
                 document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
                 document.getElementById('pnl-net').innerText = `$${pnlData.netProfit.toFixed(2)}`;
-                
                 const breakdownDiv = document.getElementById('expense-breakdown');
                 if (pnlData.expensesByCategory && Object.keys(pnlData.expensesByCategory).length > 0) {
                     breakdownDiv.innerHTML = Object.entries(pnlData.expensesByCategory).map(([cat, amt]) => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${cat}</span><strong>$${amt.toFixed(2)}</strong></div>`).join('');
@@ -260,7 +255,6 @@
             }
         } catch(e) {}
 
-        // Load Invoices
         try {
             const invRes = await fetch('/.netlify/functions/manage-invoices');
             if (invRes.ok) {
@@ -269,10 +263,13 @@
                 invBody.innerHTML = '';
                 globalInvoices.forEach(inv => {
                     const balance = inv.total_amount - (inv.deposit_paid || 0);
+                    
+                    // Buttons Wrapper (Prevents table from stretching weirdly)
                     const actionBtn = inv.status === 'Unpaid' ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32; margin-bottom:5px;">Mark Paid</button>` : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
-                    const printBtn = `<button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444; margin-left: 5px;">PDF</button>`;
-                    const editBtn = `<button onclick="editDocument(${inv.id}, 'Invoice')" class="action-btn" style="background:#f39c12; margin-left: 5px;">Edit</button>`;
-                    const delBtn = `<button onclick="deleteDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#c62828; margin-left: 5px;">Del</button>`;
+                    const printBtn = `<button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444;">PDF</button>`;
+                    const editBtn = `<button onclick="editDocument(${inv.id}, 'Invoice')" class="action-btn" style="background:#f39c12;">Edit</button>`;
+                    const delBtn = `<button onclick="deleteDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#c62828;">Del</button>`;
+                    const sendBtn = `<button onclick="sendInvoice(${inv.id})" class="action-btn" style="background:#0288d1;">Send</button>`; // <-- The New Send Button!
                     
                     invBody.innerHTML += `<tr>
                         <td><strong>#${inv.id}</strong></td>
@@ -280,13 +277,17 @@
                         <td>Total: $${inv.total_amount}<br><small style="color:#666;">Deposit: $${inv.deposit_paid || 0}</small></td>
                         <td style="font-size:1.1rem; font-weight:bold;">$${balance.toFixed(2)}</td>
                         <td>${inv.status}</td>
-                        <td>${actionBtn}<br>${printBtn} ${editBtn} ${delBtn}</td>
+                        <td>
+                            ${actionBtn}
+                            <div style="display:flex; gap:4px; margin-top:5px; flex-wrap:wrap;">
+                                ${printBtn} ${editBtn} ${delBtn} ${sendBtn}
+                            </div>
+                        </td>
                     </tr>`;
                 });
             }
         } catch(e) {}
 
-        // Load Estimates
         try {
             const estRes = await fetch('/.netlify/functions/get-estimates');
             if (estRes.ok) {
@@ -295,8 +296,8 @@
                 estBody.innerHTML = '';
                 globalEstimates.forEach(est => {
                     const printBtn = `<button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">PDF</button>`;
-                    const editBtn = `<button onclick="editDocument(${est.id}, 'Estimate')" class="action-btn" style="background:#f39c12; margin-left: 5px;">Edit</button>`;
-                    const delBtn = `<button onclick="deleteDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#c62828; margin-left: 5px;">Del</button>`;
+                    const editBtn = `<button onclick="editDocument(${est.id}, 'Estimate')" class="action-btn" style="background:#f39c12;">Edit</button>`;
+                    const delBtn = `<button onclick="deleteDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#c62828;">Del</button>`;
                     
                     estBody.innerHTML += `<tr>
                         <td><strong>#${est.id}</strong></td>
@@ -304,77 +305,63 @@
                         <td>${est.project_type || 'N/A'}</td>
                         <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
                         <td>$${est.total_amount}</td>
-                        <td>${printBtn} ${editBtn} ${delBtn}</td>
+                        <td><div style="display:flex; gap:4px; flex-wrap:wrap;">${printBtn} ${editBtn} ${delBtn}</div></td>
                     </tr>`;
                 });
             }
         } catch(e) {}
     }
 
-    // --- BUILDER & EDITING LOGIC ---
-    function openBuilder() {
-        resetBuilder();
-        document.getElementById('builder-box').style.display = 'block';
+    // --- NEW EMAIL INVOICE LOGIC ---
+    async function sendInvoice(id) {
+        if (!confirm(`Email Invoice #${id} to the client? (You will be automatically CC'd with the PDF attachment)`)) return;
+        
+        try {
+            alert('Sending email... Please wait.'); // Quick feedback so Richard knows it's working
+            const res = await fetch('/.netlify/functions/send-invoice', {
+                method: 'POST', body: JSON.stringify({ id })
+            });
+            
+            if (res.ok) {
+                alert('Invoice successfully sent!');
+            } else {
+                const data = await res.json();
+                alert(`Failed to send: ${data.error}`);
+            }
+        } catch (err) {
+            alert('Connection Error while sending.');
+        }
     }
 
+    // --- BUILDER & EDITING LOGIC ---
+    function openBuilder() { resetBuilder(); document.getElementById('builder-box').style.display = 'block'; }
+
     function resetBuilder() {
-        editingDocId = null;
-        editingDocType = null;
-        document.querySelector('input[value="Estimate"]').checked = true;
-        toggleDeposit('Estimate');
+        editingDocId = null; editingDocType = null;
+        document.querySelector('input[value="Estimate"]').checked = true; toggleDeposit('Estimate');
         document.getElementById('builder-box').style.display = 'none';
-        
         draftLines = []; renderDraftLines();
-        
-        document.getElementById('b-name').value = '';
-        document.getElementById('b-email').value = '';
-        document.getElementById('b-phone').value = '';
-        document.getElementById('b-project').value = '';
-        document.getElementById('b-po').value = '';
-        document.getElementById('b-deposit').value = '0';
-        document.getElementById('b-msg').innerText = '';
+        document.getElementById('b-name').value = ''; document.getElementById('b-email').value = ''; document.getElementById('b-phone').value = ''; document.getElementById('b-project').value = ''; document.getElementById('b-po').value = ''; document.getElementById('b-deposit').value = '0'; document.getElementById('b-msg').innerText = '';
     }
 
     function editDocument(id, docType) {
         const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
         if (!doc) return;
-
-        editingDocId = id;
-        editingDocType = docType;
-
+        editingDocId = id; editingDocType = docType;
         document.getElementById('builder-box').style.display = 'block';
+        document.querySelector(`input[name="doc_type"][value="${docType}"]`).checked = true; toggleDeposit(docType);
         
-        document.querySelector(`input[name="doc_type"][value="${docType}"]`).checked = true;
-        toggleDeposit(docType);
-        
-        document.getElementById('b-name').value = doc.client_name || '';
-        document.getElementById('b-email').value = doc.client_email || '';
-        document.getElementById('b-phone').value = doc.client_phone || '';
-        document.getElementById('b-project').value = doc.project_type || '';
-        document.getElementById('b-po').value = doc.po_job_name || '';
-        document.getElementById('b-deposit').value = doc.deposit_paid || '0';
-
-        draftLines = [...doc.itemized_lines];
-        renderDraftLines();
-        
-        // Scroll to builder
+        document.getElementById('b-name').value = doc.client_name || ''; document.getElementById('b-email').value = doc.client_email || ''; document.getElementById('b-phone').value = doc.client_phone || ''; document.getElementById('b-project').value = doc.project_type || ''; document.getElementById('b-po').value = doc.po_job_name || ''; document.getElementById('b-deposit').value = doc.deposit_paid || '0';
+        draftLines = [...doc.itemized_lines]; renderDraftLines();
         window.scrollTo({ top: document.getElementById('builder-box').offsetTop - 20, behavior: 'smooth' });
     }
 
     function renderDraftLines() {
         const tbody = document.getElementById('b-lines');
-        tbody.innerHTML = '';
-        draftTotal = 0;
+        tbody.innerHTML = ''; draftTotal = 0;
         draftLines.forEach((item, index) => {
-            const lineTotal = item.unit_price * item.qty;
-            draftTotal += lineTotal;
-            // The ✖ button deletes the row from the array!
-            tbody.innerHTML += `<tr>
-                <td>${item.item_name}</td>
-                <td>${item.qty}</td>
-                <td>$${item.unit_price}</td>
-                <td>$${lineTotal.toFixed(2)} <button onclick="removeLine(${index})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td>
-            </tr>`;
+            const lineTotal = item.unit_price * item.qty; draftTotal += lineTotal;
+            tbody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.qty}</td><td>$${item.unit_price}</td><td>$${lineTotal.toFixed(2)} <button onclick="removeLine(${index})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td></tr>`;
         });
         document.getElementById('b-total').innerText = draftTotal.toFixed(2);
     }
@@ -383,52 +370,31 @@
         const selectId = document.getElementById('b-item-select').value;
         const qty = parseFloat(document.getElementById('b-qty').value);
         if (!selectId || !qty || qty <= 0 || isNaN(qty)) return alert("Please select an item and valid quantity.");
-
         const item = globalPrices.find(p => String(p.id) === String(selectId));
         draftLines.push({ item_name: item.item_name, qty, unit_price: item.unit_price, line_total: item.unit_price * qty });
         renderDraftLines();
     }
 
-    function removeLine(index) {
-        draftLines.splice(index, 1);
-        renderDraftLines();
-    }
+    function removeLine(index) { draftLines.splice(index, 1); renderDraftLines(); }
 
     async function saveDocument() {
         const docType = document.querySelector('input[name="doc_type"]:checked').value;
         const client_name = document.getElementById('b-name').value;
         const msg = document.getElementById('b-msg');
-
         if (!client_name || draftLines.length === 0) { msg.style.color = 'red'; msg.innerText = 'Name and at least one line item required.'; return; }
-
         msg.style.color = '#111'; msg.innerText = 'Saving...';
         
         const endpoint = docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices';
         const method = editingDocId ? 'PUT' : 'POST';
-
-        const payload = {
-            client_name, 
-            client_email: document.getElementById('b-email').value, 
-            client_phone: document.getElementById('b-phone').value, 
-            po_job_name: document.getElementById('b-po').value, 
-            project_type: document.getElementById('b-project').value, 
-            deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), 
-            itemized_lines: draftLines, 
-            total_amount: draftTotal
-        };
-
+        const payload = { client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, po_job_name: document.getElementById('b-po').value, project_type: document.getElementById('b-project').value, deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), itemized_lines: draftLines, total_amount: draftTotal };
         if (editingDocId) payload.id = editingDocId;
 
         try {
             const res = await fetch(endpoint, { method: method, body: JSON.stringify(payload) });
-            if (res.ok) {
-                resetBuilder();
-                loadDashboardData(); 
-            } else { msg.style.color = 'red'; msg.innerText = 'Save Failed.'; }
+            if (res.ok) { resetBuilder(); loadDashboardData(); } else { msg.style.color = 'red'; msg.innerText = 'Save Failed.'; }
         } catch (err) { msg.style.color = 'red'; msg.innerText = 'Connection Error.'; }
     }
 
-    // --- DELETING & UTILITIES ---
     async function deleteDoc(id, docType) {
         if (!confirm(`Are you sure you want to permanently delete this ${docType}?`)) return;
         const endpoint = docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices';
@@ -444,16 +410,11 @@
         }
     }
 
-    async function markInvoicePaid(id) { 
-        await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); 
-        loadDashboardData(); 
-    }
+    async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
     
     async function submitExpense(e) { 
         e.preventDefault(); 
-        await fetch('/.netlify/functions/manage-expenses', { 
-            method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) 
-        }); 
+        await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); 
         document.getElementById('exp-amount').value = ''; document.getElementById('exp-desc').value = ''; loadDashboardData(); 
     }
 

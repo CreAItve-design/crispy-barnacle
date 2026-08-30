@@ -16,7 +16,8 @@
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
-    "nodemailer": "^9.0.1"
+    "nodemailer": "^9.0.1",
+    "pdfkit": "^0.20.2"
   },
   "repository": {
     "type": "git",
