@@ -182,21 +182,21 @@
     let globalEstimates = [];
     let draftLines = [];
     let draftTotal = 0;
+    
+    // Tracking if we are editing
+    let editingDocId = null;
+    let editingDocType = null;
 
     async function handleLogin(e) {
         e.preventDefault();
         const pass = document.getElementById('admin-pass').value;
-        const res = await fetch('/.netlify/functions/admin-auth', {
-            method: 'POST', body: JSON.stringify({ password: pass })
-        });
+        const res = await fetch('/.netlify/functions/admin-auth', { method: 'POST', body: JSON.stringify({ password: pass }) });
         if (res.ok) {
             sessionStorage.setItem('spotlight_admin', 'true');
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('dashboard-screen').style.display = 'block';
             loadDashboardData();
-        } else {
-            document.getElementById('login-error').innerText = 'Incorrect password.';
-        }
+        } else { document.getElementById('login-error').innerText = 'Incorrect password.'; }
     }
 
     window.onload = () => {
@@ -229,18 +229,15 @@
             const priceRes = await fetch('/.netlify/functions/get-prices');
             const priceBody = document.getElementById('prices-table-body');
             const dropdown = document.getElementById('b-item-select');
-            if (!priceRes.ok) throw new Error(await priceRes.text());
             globalPrices = await priceRes.json();
             priceBody.innerHTML = ''; dropdown.innerHTML = '<option value="">-- Select Material / Labor --</option>';
             globalPrices.forEach(item => {
-                // Protect against apostrophes in item names breaking the button code
                 const safeName = item.item_name.replace(/'/g, "\\'"); 
                 const editBtn = `<button onclick="editPrice(${item.id}, '${safeName}', ${item.unit_price})" style="float:right; background:#444; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Update Rate</button>`;
-                
                 priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price} ${editBtn}</td></tr>`;
                 dropdown.innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
             });
-        } catch(e) { document.getElementById('prices-table-body').innerHTML = `<tr><td colspan="4" style="color:red;">Data Error: ${e.message}</td></tr>`; }
+        } catch(e) {}
 
         // Load Clients & P&L
         try {
@@ -256,15 +253,10 @@
                 document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
                 document.getElementById('pnl-net').innerText = `$${pnlData.netProfit.toFixed(2)}`;
                 
-                // Populate Expense Breakdown HTML
                 const breakdownDiv = document.getElementById('expense-breakdown');
                 if (pnlData.expensesByCategory && Object.keys(pnlData.expensesByCategory).length > 0) {
-                    breakdownDiv.innerHTML = Object.entries(pnlData.expensesByCategory)
-                        .map(([cat, amt]) => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${cat}</span><strong>$${amt.toFixed(2)}</strong></div>`)
-                        .join('');
-                } else {
-                    breakdownDiv.innerHTML = '<p style="color:#666;">No expenses recorded yet.</p>';
-                }
+                    breakdownDiv.innerHTML = Object.entries(pnlData.expensesByCategory).map(([cat, amt]) => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${cat}</span><strong>$${amt.toFixed(2)}</strong></div>`).join('');
+                } else { breakdownDiv.innerHTML = '<p style="color:#666;">No expenses recorded yet.</p>'; }
             }
         } catch(e) {}
 
@@ -277,8 +269,10 @@
                 invBody.innerHTML = '';
                 globalInvoices.forEach(inv => {
                     const balance = inv.total_amount - (inv.deposit_paid || 0);
-                    const actionBtn = inv.status === 'Unpaid' ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32;">Mark Paid</button>` : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
-                    const printBtn = `<button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444; margin-left: 5px;">Print PDF</button>`;
+                    const actionBtn = inv.status === 'Unpaid' ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32; margin-bottom:5px;">Mark Paid</button>` : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
+                    const printBtn = `<button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444; margin-left: 5px;">PDF</button>`;
+                    const editBtn = `<button onclick="editDocument(${inv.id}, 'Invoice')" class="action-btn" style="background:#f39c12; margin-left: 5px;">Edit</button>`;
+                    const delBtn = `<button onclick="deleteDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#c62828; margin-left: 5px;">Del</button>`;
                     
                     invBody.innerHTML += `<tr>
                         <td><strong>#${inv.id}</strong></td>
@@ -286,7 +280,7 @@
                         <td>Total: $${inv.total_amount}<br><small style="color:#666;">Deposit: $${inv.deposit_paid || 0}</small></td>
                         <td style="font-size:1.1rem; font-weight:bold;">$${balance.toFixed(2)}</td>
                         <td>${inv.status}</td>
-                        <td>${actionBtn} ${printBtn}</td>
+                        <td>${actionBtn}<br>${printBtn} ${editBtn} ${delBtn}</td>
                     </tr>`;
                 });
             }
@@ -300,125 +294,153 @@
                 const estBody = document.getElementById('estimates-table-body');
                 estBody.innerHTML = '';
                 globalEstimates.forEach(est => {
-                    const printBtn = `<button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">Print PDF</button>`;
+                    const printBtn = `<button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">PDF</button>`;
+                    const editBtn = `<button onclick="editDocument(${est.id}, 'Estimate')" class="action-btn" style="background:#f39c12; margin-left: 5px;">Edit</button>`;
+                    const delBtn = `<button onclick="deleteDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#c62828; margin-left: 5px;">Del</button>`;
+                    
                     estBody.innerHTML += `<tr>
                         <td><strong>#${est.id}</strong></td>
                         <td><strong>${est.client_name}</strong><br><small>${est.po_job_name || 'N/A'}</small></td>
                         <td>${est.project_type || 'N/A'}</td>
                         <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
                         <td>$${est.total_amount}</td>
-                        <td>${printBtn}</td>
+                        <td>${printBtn} ${editBtn} ${delBtn}</td>
                     </tr>`;
                 });
             }
         } catch(e) {}
     }
 
-    // PDF / Print Generation
-    function printDoc(id, docType) {
+    // --- BUILDER & EDITING LOGIC ---
+    function openBuilder() {
+        resetBuilder();
+        document.getElementById('builder-box').style.display = 'block';
+    }
+
+    function resetBuilder() {
+        editingDocId = null;
+        editingDocType = null;
+        document.querySelector('input[value="Estimate"]').checked = true;
+        toggleDeposit('Estimate');
+        document.getElementById('builder-box').style.display = 'none';
+        
+        draftLines = []; renderDraftLines();
+        
+        document.getElementById('b-name').value = '';
+        document.getElementById('b-email').value = '';
+        document.getElementById('b-phone').value = '';
+        document.getElementById('b-project').value = '';
+        document.getElementById('b-po').value = '';
+        document.getElementById('b-deposit').value = '0';
+        document.getElementById('b-msg').innerText = '';
+    }
+
+    function editDocument(id, docType) {
         const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
         if (!doc) return;
-        
-        const itemsHtml = doc.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
-        const balHtml = docType === 'Invoice' ? `<h4 style="color:#666; margin:5px 0;">Deposit Paid: $${doc.deposit_paid || 0}</h4><h2>Balance Due: $${(doc.total_amount - (doc.deposit_paid || 0)).toFixed(2)}</h2>` : '';
 
-        document.getElementById('print-section').innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
-                <h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Spotlight Tile LLC</h1>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
-                    <div>
-                        <strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br>
-                        <strong>Bill To:</strong> ${doc.client_name}<br>
-                        Email: ${doc.client_email || 'N/A'}<br>
-                        Phone: ${doc.client_phone || 'N/A'}
-                    </div>
-                    <div style="text-align: right;">
-                        <strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br>
-                        <strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}
-                    </div>
-                </div>
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;">
-                    <thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Total</th></tr></thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-                <div style="text-align: right; margin-top: 30px;">
-                    <h3 style="margin-bottom: 5px;">Total Amount: $${doc.total_amount.toFixed(2)}</h3>
-                    ${balHtml}
-                </div>
-            </div>
-        `;
-        window.print();
+        editingDocId = id;
+        editingDocType = docType;
+
+        document.getElementById('builder-box').style.display = 'block';
+        
+        document.querySelector(`input[name="doc_type"][value="${docType}"]`).checked = true;
+        toggleDeposit(docType);
+        
+        document.getElementById('b-name').value = doc.client_name || '';
+        document.getElementById('b-email').value = doc.client_email || '';
+        document.getElementById('b-phone').value = doc.client_phone || '';
+        document.getElementById('b-project').value = doc.project_type || '';
+        document.getElementById('b-po').value = doc.po_job_name || '';
+        document.getElementById('b-deposit').value = doc.deposit_paid || '0';
+
+        draftLines = [...doc.itemized_lines];
+        renderDraftLines();
+        
+        // Scroll to builder
+        window.scrollTo({ top: document.getElementById('builder-box').offsetTop - 20, behavior: 'smooth' });
+    }
+
+    function renderDraftLines() {
+        const tbody = document.getElementById('b-lines');
+        tbody.innerHTML = '';
+        draftTotal = 0;
+        draftLines.forEach((item, index) => {
+            const lineTotal = item.unit_price * item.qty;
+            draftTotal += lineTotal;
+            // The ✖ button deletes the row from the array!
+            tbody.innerHTML += `<tr>
+                <td>${item.item_name}</td>
+                <td>${item.qty}</td>
+                <td>$${item.unit_price}</td>
+                <td>$${lineTotal.toFixed(2)} <button onclick="removeLine(${index})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td>
+            </tr>`;
+        });
+        document.getElementById('b-total').innerText = draftTotal.toFixed(2);
     }
 
     function addLineItem() {
         const selectId = document.getElementById('b-item-select').value;
         const qty = parseFloat(document.getElementById('b-qty').value);
-        if (!selectId) return alert("Please select an item.");
-        if (!qty || qty <= 0 || isNaN(qty)) return alert("Please enter a valid quantity.");
+        if (!selectId || !qty || qty <= 0 || isNaN(qty)) return alert("Please select an item and valid quantity.");
 
         const item = globalPrices.find(p => String(p.id) === String(selectId));
-        const lineTotal = item.unit_price * qty;
-        draftLines.push({ item_name: item.item_name, qty, unit_price: item.unit_price, line_total: lineTotal });
-        draftTotal += lineTotal;
+        draftLines.push({ item_name: item.item_name, qty, unit_price: item.unit_price, line_total: item.unit_price * qty });
+        renderDraftLines();
+    }
 
-        document.getElementById('b-lines').innerHTML += `<tr><td>${item.item_name}</td><td>${qty}</td><td>$${item.unit_price}</td><td>$${lineTotal.toFixed(2)}</td></tr>`;
-        document.getElementById('b-total').innerText = draftTotal.toFixed(2);
+    function removeLine(index) {
+        draftLines.splice(index, 1);
+        renderDraftLines();
     }
-    
-    async function editPrice(id, name, currentPrice) {
-        const newPrice = prompt(`Enter new Douglas County market rate for ${name}:`, currentPrice);
-    
-        // Ensure the input is valid before sending to the database
-        if (newPrice !== null && !isNaN(newPrice) && newPrice.trim() !== "") {
-            const res = await fetch('/.netlify/functions/update-price', {
-                method: 'PUT',
-                body: JSON.stringify({ id, new_price: newPrice })
-            });
-        
-            if (res.ok) {
-                loadDashboardData(); // Instantly refreshes the screen with the new price
-            } else {
-                alert("Database Error: Failed to save the new price.");
-            }
-        }
-    }
-    
+
     async function saveDocument() {
         const docType = document.querySelector('input[name="doc_type"]:checked').value;
         const client_name = document.getElementById('b-name').value;
-        const client_email = document.getElementById('b-email').value;
-        const client_phone = document.getElementById('b-phone').value;
-        const project_type = document.getElementById('b-project').value;
-        const po_job_name = document.getElementById('b-po').value;
-        const deposit_paid = document.getElementById('b-deposit').value;
         const msg = document.getElementById('b-msg');
 
-        if (!client_name || draftLines.length === 0) {
-            msg.style.color = 'red'; msg.innerText = 'Name and at least one line item required.';
-            return;
-        }
+        if (!client_name || draftLines.length === 0) { msg.style.color = 'red'; msg.innerText = 'Name and at least one line item required.'; return; }
 
-        const endpoint = docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices';
         msg.style.color = '#111'; msg.innerText = 'Saving...';
+        
+        const endpoint = docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices';
+        const method = editingDocId ? 'PUT' : 'POST';
+
+        const payload = {
+            client_name, 
+            client_email: document.getElementById('b-email').value, 
+            client_phone: document.getElementById('b-phone').value, 
+            po_job_name: document.getElementById('b-po').value, 
+            project_type: document.getElementById('b-project').value, 
+            deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), 
+            itemized_lines: draftLines, 
+            total_amount: draftTotal
+        };
+
+        if (editingDocId) payload.id = editingDocId;
 
         try {
-            const res = await fetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify({ client_name, client_email, client_phone, po_job_name, project_type, deposit_paid: parseFloat(deposit_paid || 0), itemized_lines: draftLines, total_amount: draftTotal })
-            });
-
+            const res = await fetch(endpoint, { method: method, body: JSON.stringify(payload) });
             if (res.ok) {
-                document.getElementById('builder-box').style.display = 'none';
-                draftLines = []; draftTotal = 0; document.getElementById('b-lines').innerHTML = ''; document.getElementById('b-total').innerText = '0.00';
-                document.getElementById('b-name').value = ''; document.getElementById('b-email').value = ''; document.getElementById('b-phone').value = ''; document.getElementById('b-po').value = ''; document.getElementById('b-deposit').value = '0';
-                msg.innerText = '';
+                resetBuilder();
                 loadDashboardData(); 
-            } else {
-                const errData = await res.json();
-                msg.style.color = 'red'; msg.innerText = `Save Failed: ${errData.error}`;
-            }
-        } catch (err) {
-            msg.style.color = 'red'; msg.innerText = 'Failed to connect to server.';
+            } else { msg.style.color = 'red'; msg.innerText = 'Save Failed.'; }
+        } catch (err) { msg.style.color = 'red'; msg.innerText = 'Connection Error.'; }
+    }
+
+    // --- DELETING & UTILITIES ---
+    async function deleteDoc(id, docType) {
+        if (!confirm(`Are you sure you want to permanently delete this ${docType}?`)) return;
+        const endpoint = docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices';
+        await fetch(endpoint, { method: 'DELETE', body: JSON.stringify({ id }) });
+        loadDashboardData();
+    }
+
+    async function editPrice(id, name, currentPrice) {
+        const newPrice = prompt(`Enter new Douglas County market rate for ${name}:`, currentPrice);
+        if (newPrice !== null && !isNaN(newPrice) && newPrice.trim() !== "") {
+            await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) });
+            loadDashboardData(); 
         }
     }
 
@@ -430,16 +452,31 @@
     async function submitExpense(e) { 
         e.preventDefault(); 
         await fetch('/.netlify/functions/manage-expenses', { 
-            method: 'POST', 
-            body: JSON.stringify({ 
-                category: document.getElementById('exp-category').value, 
-                amount: document.getElementById('exp-amount').value, 
-                description: document.getElementById('exp-desc').value 
-            }) 
+            method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) 
         }); 
-        document.getElementById('exp-amount').value = ''; 
-        document.getElementById('exp-desc').value = ''; 
-        loadDashboardData(); 
+        document.getElementById('exp-amount').value = ''; document.getElementById('exp-desc').value = ''; loadDashboardData(); 
+    }
+
+    function printDoc(id, docType) {
+        const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
+        if (!doc) return;
+        const itemsHtml = doc.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
+        const balHtml = docType === 'Invoice' ? `<h4 style="color:#666; margin:5px 0;">Deposit Paid: $${doc.deposit_paid || 0}</h4><h2>Balance Due: $${(doc.total_amount - (doc.deposit_paid || 0)).toFixed(2)}</h2>` : '';
+
+        document.getElementById('print-section').innerHTML = `
+            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
+                <h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Spotlight Tile LLC</h1>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+                    <div><strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br><strong>Bill To:</strong> ${doc.client_name}<br>Email: ${doc.client_email || 'N/A'}<br>Phone: ${doc.client_phone || 'N/A'}</div>
+                    <div style="text-align: right;"><strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br><strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}</div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;">
+                    <thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Total</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+                <div style="text-align: right; margin-top: 30px;"><h3 style="margin-bottom: 5px;">Total Amount: $${doc.total_amount.toFixed(2)}</h3>${balHtml}</div>
+            </div>`;
+        window.print();
     }
 </script>
 </body>
