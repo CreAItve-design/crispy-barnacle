@@ -4,9 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spotlight Tile LLC | Admin Portal</title>
-    <link rel="stylesheet" href="style.css">
     <style>
-        .admin-body { background: #f4f6f9; color: #111; padding-top: 100px; }
+        .admin-body { background: #f4f6f9; color: #111; padding-top: 100px; font-family: sans-serif; }
         .admin-container { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
         .login-box { max-width: 400px; margin: 100px auto; background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); text-align: center; }
         .admin-tabs { display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #e5e5e5; padding-bottom: 10px; }
@@ -26,18 +25,17 @@
         .form-group { margin-bottom: 15px; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
         .builder-box { background: #fafafa; padding: 20px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 30px; }
-    </style>
-</head>
-<body class="admin-body">
-
-<!-- Hidden Print Layout -->
-    <style>
+        
+        /* Hidden Print Layout */
         @media print {
             body * { display: none !important; }
             #print-section, #print-section * { display: block !important; }
             #print-section { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: white; }
         }
     </style>
+</head>
+<body class="admin-body">
+
     <div id="print-section" style="display: none;"></div>
 
     <!-- LOGIN SCREEN -->
@@ -141,8 +139,8 @@
 
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px;">Draft Estimates</h3>
             <table>
-                <thead><tr><th>Estimate #</th><th>Client / PO</th><th>Project</th><th>Status</th><th>Total</th></tr></thead>
-                <tbody id="estimates-table-body"><tr><td colspan="5">Loading records...</td></tr></tbody>
+                <thead><tr><th>Estimate #</th><th>Client / PO</th><th>Project</th><th>Status</th><th>Total</th><th>Action</th></tr></thead>
+                <tbody id="estimates-table-body"><tr><td colspan="6">Loading records...</td></tr></tbody>
             </table>
         </div>
 
@@ -185,7 +183,6 @@
     let draftLines = [];
     let draftTotal = 0;
 
-    // ... (Keep handleLogin, logout, switchTab, and toggleDeposit functions the same) ...
     async function handleLogin(e) {
         e.preventDefault();
         const pass = document.getElementById('admin-pass').value;
@@ -211,12 +208,14 @@
     };
 
     function logout() { sessionStorage.removeItem('spotlight_admin'); location.reload(); }
+    
     function switchTab(evt, tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         evt.currentTarget.classList.add('active');
     }
+    
     function toggleDeposit(type) { document.getElementById('deposit-container').style.display = type === 'Invoice' ? 'flex' : 'none'; }
 
     document.getElementById('b-name').addEventListener('input', function(e) {
@@ -234,7 +233,11 @@
             globalPrices = await priceRes.json();
             priceBody.innerHTML = ''; dropdown.innerHTML = '<option value="">-- Select Material / Labor --</option>';
             globalPrices.forEach(item => {
-                priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price}</td></tr>`;
+                // Protect against apostrophes in item names breaking the button code
+                const safeName = item.item_name.replace(/'/g, "\\'"); 
+                const editBtn = `<button onclick="editPrice(${item.id}, '${safeName}', ${item.unit_price})" style="float:right; background:#444; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Update Rate</button>`;
+                
+                priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price} ${editBtn}</td></tr>`;
                 dropdown.innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
             });
         } catch(e) { document.getElementById('prices-table-body').innerHTML = `<tr><td colspan="4" style="color:red;">Data Error: ${e.message}</td></tr>`; }
@@ -252,6 +255,16 @@
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
                 document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
                 document.getElementById('pnl-net').innerText = `$${pnlData.netProfit.toFixed(2)}`;
+                
+                // Populate Expense Breakdown HTML
+                const breakdownDiv = document.getElementById('expense-breakdown');
+                if (pnlData.expensesByCategory && Object.keys(pnlData.expensesByCategory).length > 0) {
+                    breakdownDiv.innerHTML = Object.entries(pnlData.expensesByCategory)
+                        .map(([cat, amt]) => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${cat}</span><strong>$${amt.toFixed(2)}</strong></div>`)
+                        .join('');
+                } else {
+                    breakdownDiv.innerHTML = '<p style="color:#666;">No expenses recorded yet.</p>';
+                }
             }
         } catch(e) {}
 
@@ -285,8 +298,6 @@
             if (estRes.ok) {
                 globalEstimates = await estRes.json();
                 const estBody = document.getElementById('estimates-table-body');
-                // Ensure the table headers include 'Action' so this fits
-                document.querySelector('#tab-estimates table:nth-of-type(2) thead tr').innerHTML = '<th>Estimate #</th><th>Client / PO</th><th>Project</th><th>Status</th><th>Total</th><th>Action</th>';
                 estBody.innerHTML = '';
                 globalEstimates.forEach(est => {
                     const printBtn = `<button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">Print PDF</button>`;
@@ -353,7 +364,25 @@
         document.getElementById('b-lines').innerHTML += `<tr><td>${item.item_name}</td><td>${qty}</td><td>$${item.unit_price}</td><td>$${lineTotal.toFixed(2)}</td></tr>`;
         document.getElementById('b-total').innerText = draftTotal.toFixed(2);
     }
-
+    
+    async function editPrice(id, name, currentPrice) {
+        const newPrice = prompt(`Enter new Douglas County market rate for ${name}:`, currentPrice);
+    
+        // Ensure the input is valid before sending to the database
+        if (newPrice !== null && !isNaN(newPrice) && newPrice.trim() !== "") {
+            const res = await fetch('/.netlify/functions/update-price', {
+                method: 'PUT',
+                body: JSON.stringify({ id, new_price: newPrice })
+            });
+        
+            if (res.ok) {
+                loadDashboardData(); // Instantly refreshes the screen with the new price
+            } else {
+                alert("Database Error: Failed to save the new price.");
+            }
+        }
+    }
+    
     async function saveDocument() {
         const docType = document.querySelector('input[name="doc_type"]:checked').value;
         const client_name = document.getElementById('b-name').value;
@@ -393,8 +422,25 @@
         }
     }
 
-    async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
-    async function submitExpense(e) { e.preventDefault(); await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); document.getElementById('exp-amount').value = ''; document.getElementById('exp-desc').value = ''; loadDashboardData(); }
+    async function markInvoicePaid(id) { 
+        await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); 
+        loadDashboardData(); 
+    }
+    
+    async function submitExpense(e) { 
+        e.preventDefault(); 
+        await fetch('/.netlify/functions/manage-expenses', { 
+            method: 'POST', 
+            body: JSON.stringify({ 
+                category: document.getElementById('exp-category').value, 
+                amount: document.getElementById('exp-amount').value, 
+                description: document.getElementById('exp-desc').value 
+            }) 
+        }); 
+        document.getElementById('exp-amount').value = ''; 
+        document.getElementById('exp-desc').value = ''; 
+        loadDashboardData(); 
+    }
 </script>
 </body>
 </html>
