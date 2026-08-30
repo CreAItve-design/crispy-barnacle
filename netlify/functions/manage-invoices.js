@@ -11,13 +11,7 @@ exports.handler = async (event) => {
     
     if (method === 'POST') {
         const payload = JSON.parse(event.body);
-        
-        // Auto-save client if they don't exist
-        if (payload.client_name) {
-            await supabase.from('clients').upsert([{ name: payload.client_name, email: payload.client_email }], { onConflict: 'name' });
-        }
-        
-        await supabase.from('invoices').insert([{
+        const { error: dbError } = await supabase.from('invoices').insert([{
             client_name: payload.client_name,
             client_email: payload.client_email,
             client_phone: payload.client_phone,
@@ -27,6 +21,8 @@ exports.handler = async (event) => {
             deposit_paid: payload.deposit_paid || 0,
             status: 'Unpaid'
         }]);
+        
+        if (dbError) return { statusCode: 500, body: JSON.stringify({ error: dbError.message }) };
         return { statusCode: 200, body: JSON.stringify({ success: true }) };
     }
 

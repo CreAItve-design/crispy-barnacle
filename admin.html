@@ -30,6 +30,16 @@
 </head>
 <body class="admin-body">
 
+<!-- Hidden Print Layout -->
+    <style>
+        @media print {
+            body * { display: none !important; }
+            #print-section, #print-section * { display: block !important; }
+            #print-section { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: white; }
+        }
+    </style>
+    <div id="print-section" style="display: none;"></div>
+
     <!-- LOGIN SCREEN -->
     <div id="login-screen" class="login-box">
         <h2 style="margin-bottom: 20px; font-size: 1.5rem;">Admin Portal Login</h2>
@@ -167,12 +177,15 @@
         </div>
     </div>
 
-    <script>
+<script>
     let globalPrices = [];
     let globalClients = [];
+    let globalInvoices = [];
+    let globalEstimates = [];
     let draftLines = [];
     let draftTotal = 0;
 
+    // ... (Keep handleLogin, logout, switchTab, and toggleDeposit functions the same) ...
     async function handleLogin(e) {
         e.preventDefault();
         const pass = document.getElementById('admin-pass').value;
@@ -197,67 +210,42 @@
         }
     };
 
-    function logout() {
-        sessionStorage.removeItem('spotlight_admin');
-        location.reload();
-    }
-
+    function logout() { sessionStorage.removeItem('spotlight_admin'); location.reload(); }
     function switchTab(evt, tabId) {
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
         document.getElementById(tabId).classList.add('active');
         evt.currentTarget.classList.add('active');
     }
-
-    function toggleDeposit(type) {
-        document.getElementById('deposit-container').style.display = type === 'Invoice' ? 'flex' : 'none';
-    }
+    function toggleDeposit(type) { document.getElementById('deposit-container').style.display = type === 'Invoice' ? 'flex' : 'none'; }
 
     document.getElementById('b-name').addEventListener('input', function(e) {
         const selected = globalClients.find(c => c.name === e.target.value);
-        if (selected) {
-            document.getElementById('b-email').value = selected.email || '';
-        }
+        if (selected) document.getElementById('b-email').value = selected.email || '';
     });
 
     async function loadDashboardData() {
-        // 1. Load Prices (With Visible Error Catching)
+        // Load Prices
         try {
             const priceRes = await fetch('/.netlify/functions/get-prices');
             const priceBody = document.getElementById('prices-table-body');
             const dropdown = document.getElementById('b-item-select');
-            
-            if (!priceRes.ok) {
-                const errText = await priceRes.text();
-                throw new Error(`Server Error ${priceRes.status}: ${errText}`);
-            }
-
+            if (!priceRes.ok) throw new Error(await priceRes.text());
             globalPrices = await priceRes.json();
-            priceBody.innerHTML = ''; 
-            dropdown.innerHTML = '<option value="">-- Select Material / Labor --</option>';
-            
+            priceBody.innerHTML = ''; dropdown.innerHTML = '<option value="">-- Select Material / Labor --</option>';
             globalPrices.forEach(item => {
                 priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price}</td></tr>`;
                 dropdown.innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
             });
-        } catch(e) { 
-            console.warn("Prices Load Error", e); 
-            document.getElementById('prices-table-body').innerHTML = `<tr><td colspan="4" style="color:#c62828; font-weight:bold;">Data Error: ${e.message}</td></tr>`;
-        }
+        } catch(e) { document.getElementById('prices-table-body').innerHTML = `<tr><td colspan="4" style="color:red;">Data Error: ${e.message}</td></tr>`; }
 
-        // 2. Load Clients
+        // Load Clients & P&L
         try {
             const clientRes = await fetch('/.netlify/functions/get-clients');
             if (clientRes.ok) {
                 globalClients = await clientRes.json();
-                const datalist = document.getElementById('saved-clients');
-                datalist.innerHTML = '';
-                globalClients.forEach(c => datalist.innerHTML += `<option value="${c.name}">`);
+                document.getElementById('saved-clients').innerHTML = globalClients.map(c => `<option value="${c.name}">`).join('');
             }
-        } catch(e) {}
-
-        // 3. Load P&L
-        try {
             const pnlRes = await fetch('/.netlify/functions/reports-pnl');
             if (pnlRes.ok) {
                 const pnlData = await pnlRes.json();
@@ -267,49 +255,98 @@
             }
         } catch(e) {}
 
-        // 4. Load Invoices
+        // Load Invoices
         try {
             const invRes = await fetch('/.netlify/functions/manage-invoices');
             if (invRes.ok) {
-                const invoices = await invRes.json();
+                globalInvoices = await invRes.json();
                 const invBody = document.getElementById('invoices-table-body');
                 invBody.innerHTML = '';
-                invoices.forEach(inv => {
+                globalInvoices.forEach(inv => {
                     const balance = inv.total_amount - (inv.deposit_paid || 0);
-                    const actionBtn = inv.status === 'Unpaid' 
-                        ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32;">Mark Paid</button>` 
-                        : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
+                    const actionBtn = inv.status === 'Unpaid' ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32;">Mark Paid</button>` : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
+                    const printBtn = `<button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444; margin-left: 5px;">Print PDF</button>`;
                     
                     invBody.innerHTML += `<tr>
-                        <td><strong>Invoice #${inv.id}</strong></td>
+                        <td><strong>#${inv.id}</strong></td>
                         <td><strong>${inv.client_name}</strong><br><small>${inv.po_job_name || 'N/A'}</small></td>
                         <td>Total: $${inv.total_amount}<br><small style="color:#666;">Deposit: $${inv.deposit_paid || 0}</small></td>
                         <td style="font-size:1.1rem; font-weight:bold;">$${balance.toFixed(2)}</td>
                         <td>${inv.status}</td>
-                        <td>${actionBtn}</td>
+                        <td>${actionBtn} ${printBtn}</td>
+                    </tr>`;
+                });
+            }
+        } catch(e) {}
+
+        // Load Estimates
+        try {
+            const estRes = await fetch('/.netlify/functions/get-estimates');
+            if (estRes.ok) {
+                globalEstimates = await estRes.json();
+                const estBody = document.getElementById('estimates-table-body');
+                // Ensure the table headers include 'Action' so this fits
+                document.querySelector('#tab-estimates table:nth-of-type(2) thead tr').innerHTML = '<th>Estimate #</th><th>Client / PO</th><th>Project</th><th>Status</th><th>Total</th><th>Action</th>';
+                estBody.innerHTML = '';
+                globalEstimates.forEach(est => {
+                    const printBtn = `<button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">Print PDF</button>`;
+                    estBody.innerHTML += `<tr>
+                        <td><strong>#${est.id}</strong></td>
+                        <td><strong>${est.client_name}</strong><br><small>${est.po_job_name || 'N/A'}</small></td>
+                        <td>${est.project_type || 'N/A'}</td>
+                        <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
+                        <td>$${est.total_amount}</td>
+                        <td>${printBtn}</td>
                     </tr>`;
                 });
             }
         } catch(e) {}
     }
 
-    // UPDATED: Workspace AI's Recommended Event Defenses
+    // PDF / Print Generation
+    function printDoc(id, docType) {
+        const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
+        if (!doc) return;
+        
+        const itemsHtml = doc.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
+        const balHtml = docType === 'Invoice' ? `<h4 style="color:#666; margin:5px 0;">Deposit Paid: $${doc.deposit_paid || 0}</h4><h2>Balance Due: $${(doc.total_amount - (doc.deposit_paid || 0)).toFixed(2)}</h2>` : '';
+
+        document.getElementById('print-section').innerHTML = `
+            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
+                <h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Spotlight Tile LLC</h1>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+                    <div>
+                        <strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br>
+                        <strong>Bill To:</strong> ${doc.client_name}<br>
+                        Email: ${doc.client_email || 'N/A'}<br>
+                        Phone: ${doc.client_phone || 'N/A'}
+                    </div>
+                    <div style="text-align: right;">
+                        <strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br>
+                        <strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}
+                    </div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;">
+                    <thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Total</th></tr></thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+                <div style="text-align: right; margin-top: 30px;">
+                    <h3 style="margin-bottom: 5px;">Total Amount: $${doc.total_amount.toFixed(2)}</h3>
+                    ${balHtml}
+                </div>
+            </div>
+        `;
+        window.print();
+    }
+
     function addLineItem() {
         const selectId = document.getElementById('b-item-select').value;
         const qty = parseFloat(document.getElementById('b-qty').value);
-        
-        // Structural Check 1: Ensure an item is actually selected
-        if (!selectId) return alert("Please select a valid Material or Labor item from the list.");
-        
-        // Structural Check 2: Ensure quantity is a valid number
-        if (!qty || qty <= 0 || isNaN(qty)) return alert("Please enter a valid numeric quantity greater than 0.");
+        if (!selectId) return alert("Please select an item.");
+        if (!qty || qty <= 0 || isNaN(qty)) return alert("Please enter a valid quantity.");
 
-        // Exact Property Mapping
         const item = globalPrices.find(p => String(p.id) === String(selectId));
-        if (!item) return alert("System Error: Could not locate item details in memory.");
-
         const lineTotal = item.unit_price * qty;
-        
         draftLines.push({ item_name: item.item_name, qty, unit_price: item.unit_price, line_total: lineTotal });
         draftTotal += lineTotal;
 
@@ -317,7 +354,6 @@
         document.getElementById('b-total').innerText = draftTotal.toFixed(2);
     }
 
-    // Save Document & Expenses functions remain identical...
     async function saveDocument() {
         const docType = document.querySelector('input[name="doc_type"]:checked').value;
         const client_name = document.getElementById('b-name').value;
@@ -334,39 +370,31 @@
         }
 
         const endpoint = docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices';
+        msg.style.color = '#111'; msg.innerText = 'Saving...';
 
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    client_name, client_email, client_phone, po_job_name, project_type, 
-                    deposit_paid: parseFloat(deposit_paid || 0), 
-                    itemized_lines: draftLines, total_amount: draftTotal 
-                })
+                body: JSON.stringify({ client_name, client_email, client_phone, po_job_name, project_type, deposit_paid: parseFloat(deposit_paid || 0), itemized_lines: draftLines, total_amount: draftTotal })
             });
 
             if (res.ok) {
                 document.getElementById('builder-box').style.display = 'none';
-                draftLines = []; draftTotal = 0;
-                document.getElementById('b-lines').innerHTML = '';
-                document.getElementById('b-total').innerText = '0.00';
-                document.getElementById('b-name').value = '';
-                document.getElementById('b-phone').value = '';
-                document.getElementById('b-po').value = '';
-                document.getElementById('b-deposit').value = '0';
+                draftLines = []; draftTotal = 0; document.getElementById('b-lines').innerHTML = ''; document.getElementById('b-total').innerText = '0.00';
+                document.getElementById('b-name').value = ''; document.getElementById('b-email').value = ''; document.getElementById('b-phone').value = ''; document.getElementById('b-po').value = ''; document.getElementById('b-deposit').value = '0';
+                msg.innerText = '';
                 loadDashboardData(); 
+            } else {
+                const errData = await res.json();
+                msg.style.color = 'red'; msg.innerText = `Save Failed: ${errData.error}`;
             }
         } catch (err) {
-            msg.style.color = 'red'; msg.innerText = 'Failed to save.';
+            msg.style.color = 'red'; msg.innerText = 'Failed to connect to server.';
         }
     }
 
-    async function markInvoicePaid(id) {
-        await fetch('/.netlify/functions/manage-invoices', {
-            method: 'PUT', body: JSON.stringify({ id, status: 'Paid' })
-        });
-        loadDashboardData();
-    }
+    async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
+    async function submitExpense(e) { e.preventDefault(); await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); document.getElementById('exp-amount').value = ''; document.getElementById('exp-desc').value = ''; loadDashboardData(); }
 </script>
 </body>
 </html>
