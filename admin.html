@@ -162,9 +162,13 @@
 
         <!-- TAB 3: PRICE SHEET -->
         <div id="tab-prices" class="tab-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                 <h2>Itemized Price Sheet</h2>
-                <button class="action-btn" onclick="document.getElementById('add-price-box').style.display='block'">+ Add New Item</button>
+                <div style="display: flex; gap: 10px;">
+                    <button class="action-btn" style="background: #444;" onclick="printPriceSheet()">Print / PDF</button>
+                    <button class="action-btn" style="background: #0288d1;" onclick="exportPriceSheetCSV()">Export CSV</button>
+                    <button class="action-btn" onclick="document.getElementById('add-price-box').style.display='block'">+ Add New Item</button>
+                </div>
             </div>
 
             <!-- ADD NEW PRICE BUILDER -->
@@ -543,6 +547,31 @@
         window.print();
     }
     
+    function printPriceSheet() {
+        const itemsHtml = globalPrices.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.category}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.unit}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.unit_price.toFixed(2)}</td></tr>`).join('');
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2><table style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item Name</th><th style="padding: 10px;">Category</th><th style="padding: 10px;">Cost Unit</th><th style="padding: 10px;">Base Cost ($)</th></tr></thead><tbody>${itemsHtml}</tbody></table></div>`;
+        window.print();
+    }
+
+    function exportPriceSheetCSV() {
+        if (globalPrices.length === 0) return alert("No prices to export.");
+        let csvContent = "Item Name,Category,Cost Unit,Base Cost\n";
+        globalPrices.forEach(item => {
+            const safeName = item.item_name ? `"${item.item_name.replace(/"/g, '""')}"` : '""';
+            const safeCat = item.category ? `"${item.category.replace(/"/g, '""')}"` : '""';
+            const safeUnit = item.unit ? `"${item.unit.replace(/"/g, '""')}"` : '""';
+            csvContent += `${safeName},${safeCat},${safeUnit},${item.unit_price}\n`;
+        });
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Spotlight_Price_Sheet_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     async function emailPnL() { if (confirm('Email this report to yourself?')) { await fetch('/.netlify/functions/email-report', { method: 'POST', body: JSON.stringify({ startDate: document.getElementById('pnl-start').value, endDate: document.getElementById('pnl-end').value, rev: document.getElementById('pnl-revenue').innerText, exp: document.getElementById('pnl-expenses').innerText, net: document.getElementById('pnl-net').innerText, breakdownHtml: document.getElementById('expense-breakdown').innerHTML }) }); alert('Report emailed successfully!'); } }
 </script>
 </body>
