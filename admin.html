@@ -164,36 +164,47 @@
             <table><thead><tr><th>PO #</th><th>Contractor</th><th>Client Ref</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="pos-table-body"></tbody></table>
         </div>
 
-        <!-- TAB 3: PRICE SHEET -->
+<!-- TAB 3: PRICE SHEET -->
         <div id="tab-prices" class="tab-content">
-            <h2>Itemized Price Sheet</h2>
-            <table><thead><tr><th>Item Name</th><th>Category</th><th>Cost Unit</th><th>Base Cost ($)</th></tr></thead><tbody id="prices-table-body"><tr><td colspan="4">Loading price sheet...</td></tr></tbody></table>
-        </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Itemized Price Sheet</h2>
+                <button class="action-btn" onclick="document.getElementById('add-price-box').style.display='block'">+ Add New Item</button>
+            </div>
 
-        <!-- TAB 4: LOG EXPENSES -->
-        <div id="tab-expenses" class="tab-content">
-            <h2>Record a Business Expense</h2>
-            <form onsubmit="submitExpense(event)" style="max-width: 500px;">
-                <div class="form-group">
-                    <select id="exp-category" required>
-                        <option value="Payroll (Owner / W2)">Payroll (Owner / W2)</option>
-                        <option value="1099 Contractor / IC">1099 Contractor / IC</option>
-                        <option value="Office Supplies">Office Supplies</option>
-                        <option value="Technology & Software">Technology & Software</option>
-                        <option value="Credit Card / Debt Service">Credit Card / Debt Service</option>
-                        <option value="Utilities">Utilities</option>
-                        <option value="Equipment Repairs">Equipment Repairs</option>
-                        <option value="Company Meals (50% Deductible)">Company Meals (50% Deductible)</option>
-                        <option value="Vehicle / Fuel">Vehicle & Gas</option>
-                        <option value="Tools & Equipment">Tools & Equipment</option>
-                        <option value="Miscellaneous">Miscellaneous</option>
-                    </select>
+            <!-- ADD NEW PRICE BUILDER -->
+            <div id="add-price-box" class="builder-box" style="display: none; background: #e8f5e9; border-color: #a5d6a7;">
+                <h3 style="margin-bottom: 15px; color:#2e7d32;">Add New Price Sheet Item</h3>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="new-item-name" placeholder="Item Name (e.g., Premium Ceramic Tile)" style="flex:2; padding:8px;" required>
+                    <input type="text" id="new-item-cat" list="price-categories" placeholder="Category" style="flex:1; padding:8px;" required>
+                    <datalist id="price-categories">
+                        <option value="Labor">
+                        <option value="Substrate & Backer">
+                        <option value="Setting Materials">
+                        <option value="Grout">
+                        <option value="Valves & Drains">
+                        <option value="Trims & Profiles">
+                        <option value="Fittings & Supplies">
+                        <option value="Installation Tools">
+                    </datalist>
                 </div>
-                <div class="form-group"><input type="text" id="exp-vendor" placeholder="Vendor / Contractor Name (For 1099 Tracking)"></div>
-                <div class="form-group"><input type="number" step="0.01" id="exp-amount" required placeholder="Amount ($)"></div>
-                <div class="form-group"><textarea id="exp-desc" rows="3" placeholder="Description / Memo..."></textarea></div>
-                <button type="submit" class="action-btn" style="padding: 12px 25px;">Save Expense</button>
-            </form>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="new-item-unit" placeholder="Cost Unit (e.g., per sq ft, each, bag)" style="flex:1; padding:8px;" required>
+                    <div style="display: flex; align-items: center; gap: 5px; flex:1;">
+                        <span style="font-weight:bold;">$</span>
+                        <input type="number" id="new-item-price" step="0.01" placeholder="Base Cost (No Markup)" style="width:100%; padding:8px;" required>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <button class="action-btn" style="background: #666;" onclick="document.getElementById('add-price-box').style.display='none'">Cancel</button>
+                    <button class="action-btn" style="background: #2e7d32;" onclick="saveNewPrice()">Save Item</button>
+                </div>
+            </div>
+
+            <table>
+                <thead><tr><th>Item Name</th><th>Category</th><th>Cost Unit</th><th>Base Cost ($)</th></tr></thead>
+                <tbody id="prices-table-body"><tr><td colspan="4">Loading price sheet...</td></tr></tbody>
+            </table>
         </div>
     </div>
 
@@ -453,12 +464,45 @@
     async function submitExpense(e) { e.preventDefault(); await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); document.getElementById('exp-amount').value = ''; document.getElementById('exp-desc').value = ''; loadDashboardData(); }
     async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
     async function sendEstimate(id) { if (confirm('Email Estimate?')) { alert('Sending...'); await fetch('/.netlify/functions/send-estimate', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
+async function saveNewPrice() {
+        const item_name = document.getElementById('new-item-name').value;
+        const category = document.getElementById('new-item-cat').value;
+        const unit = document.getElementById('new-item-unit').value;
+        const unit_price = document.getElementById('new-item-price').value;
 
-    function printDoc(id, docType) {
+        if (!item_name || !category || !unit || !unit_price) return alert('Please fill out all fields.');
+
+        document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Saving...';
+
+        try {
+            const res = await fetch('/.netlify/functions/add-price', {
+                method: 'POST',
+                body: JSON.stringify({ item_name, category, unit, unit_price })
+            });
+
+            if (res.ok) {
+                document.getElementById('add-price-box').style.display = 'none';
+                document.getElementById('new-item-name').value = '';
+                document.getElementById('new-item-cat').value = '';
+                document.getElementById('new-item-unit').value = '';
+                document.getElementById('new-item-price').value = '';
+                document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item';
+                loadDashboardData(); // Instantly refreshes the table to show the new item
+            } else {
+                const err = await res.json();
+                alert(`Failed to save: ${err.error}`);
+                document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item';
+            }
+        } catch (e) {
+            alert('Connection Error while saving.');
+            document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item';
+        }
+    }
+function printDoc(id, docType) {
         const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
         const itemsHtml = doc.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
         const cmtHtml = doc.comments ? `<div style="margin-top:20px; padding:15px; background:#f9f9f9; border-left:4px solid #111;"><strong>Notes:</strong><br>${doc.comments}</div>` : '';
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/logo.png" style="max-height: 100px;"></div><div style="display: flex; justify-content: space-between; margin-bottom: 40px; border-top: 2px solid #111; padding-top: 20px;"><div><strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br><strong>Bill To:</strong> ${doc.client_name}<br>${doc.client_address || ''}</div><div style="text-align: right;"><strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br><strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3 style="margin-bottom: 5px;">Total: $${doc.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 100px;"></div><div style="display: flex; justify-content: space-between; margin-bottom: 40px; border-top: 2px solid #111; padding-top: 20px;"><div><strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br><strong>Bill To:</strong> ${doc.client_name}<br>${doc.client_address || ''}</div><div style="text-align: right;"><strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br><strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3 style="margin-bottom: 5px;">Total: $${doc.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
         window.print();
     }
 
@@ -467,12 +511,12 @@
         const itemsHtml = po.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.unit_price.toFixed(2)}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
         const contactHtml = `${po.ic_email ? `Email: ${po.ic_email}<br>` : ''}${po.ic_phone ? `Phone: ${po.ic_phone}<br>` : ''}`;
         const cmtHtml = po.comments ? `<div style="margin-top:20px; padding:15px; background:#e3f2fd; border-left:4px solid #1565c0;"><strong>Instructions:</strong><br>${po.comments}</div>` : '';
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/logo.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Scope</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Piece Rate</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Scope</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Piece Rate</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
         window.print();
     }
 
     function printPnL() {
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/logo.png" style="max-height: 80px;"></div><h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Profit & Loss Report</h1><p><strong>Dates:</strong> ${document.getElementById('pnl-start').value || 'All Time'} to ${document.getElementById('pnl-end').value || 'Present'}</p><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><tr style="background: #f4f6f9;"><th style="padding: 10px;">Category</th><th style="padding: 10px; text-align:right;">Amount</th></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Revenue</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-revenue').innerText}</strong></td></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Expenses</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-expenses').innerText}</strong></td></tr><tr style="background: #e8f5e9;"><td style="padding: 10px;"><strong>Net Operating Profit</strong></td><td style="padding: 10px; text-align:right; color: #2e7d32;"><strong>${document.getElementById('pnl-net').innerText}</strong></td></tr></table><h3 style="margin-top: 30px;">Expense Breakdown</h3><div style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">${document.getElementById('expense-breakdown').innerHTML}</div></div>`;
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Profit & Loss Report</h1><p><strong>Dates:</strong> ${document.getElementById('pnl-start').value || 'All Time'} to ${document.getElementById('pnl-end').value || 'Present'}</p><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><tr style="background: #f4f6f9;"><th style="padding: 10px;">Category</th><th style="padding: 10px; text-align:right;">Amount</th></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Revenue</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-revenue').innerText}</strong></td></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Expenses</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-expenses').innerText}</strong></td></tr><tr style="background: #e8f5e9;"><td style="padding: 10px;"><strong>Net Operating Profit</strong></td><td style="padding: 10px; text-align:right; color: #2e7d32;"><strong>${document.getElementById('pnl-net').innerText}</strong></td></tr></table><h3 style="margin-top: 30px;">Expense Breakdown</h3><div style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">${document.getElementById('expense-breakdown').innerHTML}</div></div>`;
         window.print();
     }
     

@@ -20,7 +20,7 @@ exports.handler = async (event) => {
         // Add Logo
         let logoBuffer;
         try {
-            const res = await fetch('https://spotlight-tile.com/logo.png');
+            const res = await fetch('https://spotlight-tile.com/image.png');
             if (res.ok) logoBuffer = Buffer.from(await res.arrayBuffer());
         } catch(e) {}
 
@@ -89,7 +89,7 @@ exports.handler = async (event) => {
                 subject: `Purchase Order PO-${po.id} from Spotlight Tile LLC`,
                 html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e5e5; padding: 20px;">
-                    <div style="text-align: center;"><img src="https://spotlight-tile.com/logo.png" alt="Spotlight Tile" width="160"></div>
+                    <div style="text-align: center;"><img src="https://spotlight-tile.com/image.png" alt="Spotlight Tile" width="160"></div>
                     <h2 style="color: #1565c0; text-align: center;">Purchase Order (PO-${po.id})</h2>
                     <p><strong>Contractor:</strong> ${po.ic_name}<br><strong>Site:</strong> ${po.client_address || po.client_name}</p>
                     <table style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: left;">

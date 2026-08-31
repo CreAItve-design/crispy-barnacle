@@ -18,7 +18,7 @@ exports.handler = async (event) => {
         // Fetch & Add Logo to PDF
         let logoBuffer;
         try {
-            const res = await fetch('https://spotlight-tile.com/logo.png');
+            const res = await fetch('https://spotlight-tile.com/image.png');
             if (res.ok) logoBuffer = Buffer.from(await res.arrayBuffer());
         } catch(e) {}
 
@@ -79,7 +79,7 @@ exports.handler = async (event) => {
                 subject: `Spotlight Tile Estimate #${est.id} - ${est.client_name}`,
                 html: `
                 <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e5e5; padding: 20px;">
-                    <div style="text-align: center;"><img src="https://spotlight-tile.com/logo.png" alt="Spotlight Tile LLC" width="160"></div>
+                    <div style="text-align: center;"><img src="https://spotlight-tile.com/image.png" alt="Spotlight Tile LLC" width="160"></div>
                     <h2 style="color: #111; text-align: center;">Official Estimate</h2>
                     <p><strong>Client:</strong> ${est.client_name}<br><strong>Project:</strong> ${est.po_job_name || est.project_type || 'Tile Installation'}</p>
                     <table style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: left;">

@@ -22,7 +22,7 @@ exports.handler = async (event) => {
         // Fetch & Add Logo to PDF
         let logoBuffer;
         try {
-            const res = await fetch('https://spotlight-tile.com/logo.png');
+            const res = await fetch('https://spotlight-tile.com/image.png');
             if (res.ok) logoBuffer = Buffer.from(await res.arrayBuffer());
         } catch(e) {}
 
