@@ -64,9 +64,7 @@
         <!-- TAB 1: P&L SUMMARY -->
         <div id="tab-pnl" class="tab-content active">
             <h2>Financial Reports</h2>
-            
             <div id="1099-flags" class="flag-box"></div>
-
             <div class="toolbar">
                 <strong style="margin-right: 10px;">Filter Dates (For Taxes):</strong>
                 <input type="date" id="pnl-start" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;"> <span>to</span>
@@ -76,7 +74,6 @@
                 <button class="action-btn" onclick="printPnL()" style="background: #444;">Print / PDF</button>
                 <button class="action-btn" onclick="emailPnL()" style="background: #0288d1;">Email Report</button>
             </div>
-
             <div class="stats-grid">
                 <div class="stat-card"><h3>Total Revenue</h3><p id="pnl-revenue">$0.00</p></div>
                 <div class="stat-card"><h3>Total Expenses</h3><p id="pnl-expenses">$0.00</p></div>
@@ -100,7 +97,6 @@
                     <label style="margin-right: 20px; font-weight:bold;"><input type="radio" name="doc_type" value="Estimate" checked onchange="toggleDeposit(this.value)"> Estimate</label>
                     <label style="font-weight:bold;"><input type="radio" name="doc_type" value="Invoice" onchange="toggleDeposit(this.value)"> Invoice</label>
                 </div>
-
                 <datalist id="saved-clients"></datalist>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <input type="text" id="b-name" list="saved-clients" placeholder="Client Name *" style="flex:1; padding:8px;" required>
@@ -112,20 +108,16 @@
                     <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
                     <input type="text" id="b-po" placeholder="PO / Job Name" style="flex:1; padding:8px;">
                 </div>
-                
                 <textarea id="b-comments" rows="2" placeholder="Notes / Comments for Client..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
-                
                 <div id="deposit-container" style="display: none; margin-bottom: 15px; align-items: center; gap: 10px;">
                     <label style="font-weight: bold;">Initial Deposit Paid: $</label>
                     <input type="number" id="b-deposit" value="0" step="0.01" style="padding:8px; width: 120px;">
                 </div>
-                
                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">
                     <select id="b-item-select" style="flex:2; padding:8px;"><option value="">-- Select Material / Labor --</option></select>
                     <input type="number" id="b-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
                     <button class="action-btn" onclick="addLineItem()">Add Line</button>
                 </div>
-
                 <table style="margin-bottom: 15px;"><thead><tr><th>Item</th><th>Qty</th><th>Client Price</th><th>Line Total</th></tr></thead><tbody id="b-lines"></tbody></table>
                 <h2 style="text-align: right; margin-bottom: 20px;">Total: $<span id="b-total">0.00</span></h2>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="resetBuilder()">Cancel</button> <button class="action-btn" style="background: #2e7d32;" onclick="saveDocument()">Save Document</button></div>
@@ -136,12 +128,15 @@
             <div id="po-builder-box" class="builder-box" style="display: none; background: #e3f2fd; border-color: #90caf9;">
                 <h3 style="margin-bottom: 15px; color:#1565c0;">Build Independent Contractor PO</h3>
                 <p><strong>Client:</strong> <span id="po-client"></span> | <strong>Address:</strong> <span id="po-address"></span></p>
+                
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; margin-top:15px;">
-                    <input type="text" id="po-ic-name" placeholder="Contractor / Vendor Name *" style="flex:1; padding:8px;" required>
+                    <input type="text" id="po-ic-name" placeholder="Contractor Name *" style="flex:1; padding:8px;" required>
+                    <input type="email" id="po-ic-email" placeholder="Contractor Email" style="flex:1; padding:8px;">
+                    <input type="tel" id="po-ic-phone" placeholder="Contractor Phone" style="flex:1; padding:8px;">
                     <input type="text" id="po-labor-type" placeholder="Labor Type" style="flex:1; padding:8px;">
                 </div>
+
                 <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
-                
                 <table style="margin-bottom: 15px;"><thead><tr><th>Item / Scope</th><th>Qty</th><th>Set Piece Rate ($)</th><th>Total Payout</th></tr></thead><tbody id="po-lines"></tbody></table>
                 <h2 style="text-align: right; margin-bottom: 20px;">PO Total: $<span id="po-total">0.00</span></h2>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('po-builder-box').style.display='none'">Cancel</button> <button class="action-btn" style="background: #1565c0;" onclick="savePO()">Issue PO</button></div>
@@ -154,7 +149,7 @@
             <table><thead><tr><th>#</th><th>Client / PO</th><th>Project</th><th>Total</th><th>Action</th></tr></thead><tbody id="estimates-table-body"></tbody></table>
             
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px; margin-top:30px; color:#1565c0;">Purchase Orders (Contractors)</h3>
-            <table><thead><tr><th>PO #</th><th>Contractor</th><th>Client Ref</th><th>Total</th><th>Action</th></tr></thead><tbody id="pos-table-body"></tbody></table>
+            <table><thead><tr><th>PO #</th><th>Contractor</th><th>Client Ref</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="pos-table-body"></tbody></table>
         </div>
 
         <!-- TAB 3: PRICE SHEET -->
@@ -228,7 +223,6 @@
                 const pnlData = await pnlRes.json();
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
                 document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
-                
                 const netEl = document.getElementById('pnl-net');
                 netEl.innerText = `$${pnlData.netProfit.toFixed(2)}`;
                 netEl.style.color = pnlData.netProfit >= 0 ? '#2e7d32' : '#c62828';
@@ -293,7 +287,12 @@
                         <td><strong>${po.ic_name}</strong><br><small>${po.labor_type || ''}</small></td>
                         <td>${po.client_name}<br><small>${po.client_address || ''}</small></td>
                         <td><strong>$${po.total_amount}</strong></td>
-                        <td><div style="display:flex; gap:4px;"><button onclick="printPO(${po.id})" class="action-btn" style="background:#444;">PDF</button> <button onclick="deletePO(${po.id})" class="action-btn" style="background:#c62828;">Del</button></div></td>
+                        <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${po.status || 'Issued'}</span></td>
+                        <td><div style="display:flex; gap:4px; flex-wrap:wrap;">
+                            <button onclick="printPO(${po.id})" class="action-btn" style="background:#444;">PDF</button> 
+                            <button onclick="sendPO(${po.id})" class="action-btn" style="background:#0288d1;">Send</button>
+                            <button onclick="deletePO(${po.id})" class="action-btn" style="background:#c62828;">Del</button>
+                        </div></td>
                     </tr>`;
                 });
             }
@@ -307,7 +306,7 @@
         document.getElementById('builder-box').style.display = 'none';
         document.getElementById('po-client').innerText = currentInvForPO.client_name;
         document.getElementById('po-address').innerText = currentInvForPO.client_address || 'N/A';
-        document.getElementById('po-ic-name').value = ''; document.getElementById('po-labor-type').value = ''; document.getElementById('po-comments').value = '';
+        ['po-ic-name', 'po-ic-email', 'po-ic-phone', 'po-labor-type', 'po-comments'].forEach(id => document.getElementById(id).value = '');
         
         let linesHtml = ''; poDraftLines = [];
         currentInvForPO.itemized_lines.forEach((item, idx) => {
@@ -336,13 +335,27 @@
         const ic_name = document.getElementById('po-ic-name').value;
         if (!ic_name) return alert('Contractor name required.');
         const payload = {
-            invoice_id: currentInvForPO.id, ic_name, client_name: currentInvForPO.client_name, client_address: currentInvForPO.client_address,
+            invoice_id: currentInvForPO.id, ic_name, 
+            ic_email: document.getElementById('po-ic-email').value,
+            ic_phone: document.getElementById('po-ic-phone').value,
+            client_name: currentInvForPO.client_name, client_address: currentInvForPO.client_address,
             labor_type: document.getElementById('po-labor-type').value, comments: document.getElementById('po-comments').value,
-            itemized_lines: poDraftLines, total_amount: poDraftTotal
+            itemized_lines: poDraftLines, total_amount: poDraftTotal, status: 'Issued'
         };
         await fetch('/.netlify/functions/manage-pos', { method: 'POST', body: JSON.stringify(payload) });
         document.getElementById('po-builder-box').style.display = 'none'; loadDashboardData();
     }
+
+    async function sendPO(id) {
+        if (!confirm(`Email PO #${id} to the contractor? (You will be automatically CC'd)`)) return;
+        alert('Sending PO... Please wait.');
+        try {
+            const res = await fetch('/.netlify/functions/send-po', { method: 'POST', body: JSON.stringify({ id }) });
+            if (res.ok) { alert('PO Sent!'); loadDashboardData(); } 
+            else { const data = await res.json(); alert(`Failed to send: ${data.error}`); }
+        } catch(e) { alert('Connection Error.'); }
+    }
+
     async function deletePO(id) { if(confirm('Delete PO?')) { await fetch('/.netlify/functions/manage-pos', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
 
     // --- CLIENT BUILDER ---
@@ -398,6 +411,8 @@
     async function editPrice(id, name, currentPrice) { const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); if (newPrice) { await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); loadDashboardData(); } }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
     async function submitExpense(e) { e.preventDefault(); await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); document.getElementById('exp-amount').value = ''; document.getElementById('exp-desc').value = ''; loadDashboardData(); }
+    async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
+    async function sendEstimate(id) { if (confirm('Email Estimate?')) { alert('Sending...'); await fetch('/.netlify/functions/send-estimate', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
 
     function printDoc(id, docType) {
         const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
@@ -410,8 +425,9 @@
     function printPO(id) {
         const po = globalPOs.find(p => p.id === id);
         const itemsHtml = po.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.unit_price.toFixed(2)}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
+        const contactHtml = `${po.ic_email ? `Email: ${po.ic_email}<br>` : ''}${po.ic_phone ? `Phone: ${po.ic_phone}<br>` : ''}`;
         const cmtHtml = po.comments ? `<div style="margin-top:20px; padding:15px; background:#e3f2fd; border-left:4px solid #1565c0;"><strong>Instructions:</strong><br>${po.comments}</div>` : '';
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/logo.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br><strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Scope</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Piece Rate</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/logo.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Scope</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Piece Rate</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
         window.print();
     }
 
@@ -421,8 +437,6 @@
     }
     
     async function emailPnL() { if (confirm('Email this report to yourself?')) { await fetch('/.netlify/functions/email-report', { method: 'POST', body: JSON.stringify({ startDate: document.getElementById('pnl-start').value, endDate: document.getElementById('pnl-end').value, rev: document.getElementById('pnl-revenue').innerText, exp: document.getElementById('pnl-expenses').innerText, net: document.getElementById('pnl-net').innerText, breakdownHtml: document.getElementById('expense-breakdown').innerHTML }) }); alert('Report emailed successfully!'); } }
-    async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
-    async function sendEstimate(id) { if (confirm('Email Estimate?')) { alert('Sending...'); await fetch('/.netlify/functions/send-estimate', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
 </script>
 </body>
 </html>
