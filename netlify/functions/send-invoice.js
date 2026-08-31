@@ -14,16 +14,27 @@ exports.handler = async (event) => {
 
         if (error || !invoice) throw new Error('Invoice not found');
 
-        // 2. Draw the PDF in server memory
+// 2. Draw the PDF in server memory
         const doc = new PDFDocument({ margin: 50 });
         let buffers = [];
         doc.on('data', buffers.push.bind(buffers));
 
-        // --- PDF Formatting ---
-        doc.fontSize(22).text('Spotlight Tile LLC', { align: 'center' });
-        doc.moveDown();
+        // Fetch & Add Logo to PDF
+        let logoBuffer;
+        try {
+            const res = await fetch('https://spotlight-tile.com/logo.png');
+            if (res.ok) logoBuffer = Buffer.from(await res.arrayBuffer());
+        } catch(e) {}
+
+        if (logoBuffer) {
+            doc.image(logoBuffer, (doc.page.width - 160) / 2, 50, { width: 160 });
+            doc.y = 130; 
+        } else {
+            doc.fontSize(22).text('Spotlight Tile LLC', { align: 'center' }).moveDown();
+        }
+
         doc.fontSize(16).text(`INVOICE #${invoice.id}`);
-        doc.fontSize(10).text(`Date: ${new Date(invoice.created_at || invoice.issue_date || new Date()).toLocaleDateString()}`);
+        // ... (Leave the rest of the file exactly the same)        
         doc.moveDown();
         
         doc.text(`Bill To: ${invoice.client_name}`);

@@ -264,12 +264,11 @@
                 globalInvoices.forEach(inv => {
                     const balance = inv.total_amount - (inv.deposit_paid || 0);
                     
-                    // Buttons Wrapper (Prevents table from stretching weirdly)
                     const actionBtn = inv.status === 'Unpaid' ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32; margin-bottom:5px;">Mark Paid</button>` : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
                     const printBtn = `<button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444;">PDF</button>`;
                     const editBtn = `<button onclick="editDocument(${inv.id}, 'Invoice')" class="action-btn" style="background:#f39c12;">Edit</button>`;
                     const delBtn = `<button onclick="deleteDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#c62828;">Del</button>`;
-                    const sendBtn = `<button onclick="sendInvoice(${inv.id})" class="action-btn" style="background:#0288d1;">Send</button>`; // <-- The New Send Button!
+                    const sendBtn = `<button onclick="sendInvoice(${inv.id})" class="action-btn" style="background:#0288d1;">Send</button>`;
                     
                     invBody.innerHTML += `<tr>
                         <td><strong>#${inv.id}</strong></td>
@@ -298,6 +297,7 @@
                     const printBtn = `<button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">PDF</button>`;
                     const editBtn = `<button onclick="editDocument(${est.id}, 'Estimate')" class="action-btn" style="background:#f39c12;">Edit</button>`;
                     const delBtn = `<button onclick="deleteDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#c62828;">Del</button>`;
+                    const sendBtn = `<button onclick="sendEstimate(${est.id})" class="action-btn" style="background:#0288d1;">Send</button>`;
                     
                     estBody.innerHTML += `<tr>
                         <td><strong>#${est.id}</strong></td>
@@ -305,32 +305,32 @@
                         <td>${est.project_type || 'N/A'}</td>
                         <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${est.status}</span></td>
                         <td>$${est.total_amount}</td>
-                        <td><div style="display:flex; gap:4px; flex-wrap:wrap;">${printBtn} ${editBtn} ${delBtn}</div></td>
+                        <td><div style="display:flex; gap:4px; flex-wrap:wrap;">${printBtn} ${editBtn} ${delBtn} ${sendBtn}</div></td>
                     </tr>`;
                 });
             }
         } catch(e) {}
     }
 
-    // --- NEW EMAIL INVOICE LOGIC ---
+    // --- NEW EMAIL LOGIC ---
     async function sendInvoice(id) {
         if (!confirm(`Email Invoice #${id} to the client? (You will be automatically CC'd with the PDF attachment)`)) return;
-        
         try {
-            alert('Sending email... Please wait.'); // Quick feedback so Richard knows it's working
-            const res = await fetch('/.netlify/functions/send-invoice', {
-                method: 'POST', body: JSON.stringify({ id })
-            });
-            
-            if (res.ok) {
-                alert('Invoice successfully sent!');
-            } else {
-                const data = await res.json();
-                alert(`Failed to send: ${data.error}`);
-            }
-        } catch (err) {
-            alert('Connection Error while sending.');
-        }
+            alert('Sending email... Please wait.'); 
+            const res = await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) });
+            if (res.ok) { alert('Invoice successfully sent!'); loadDashboardData(); } 
+            else { const data = await res.json(); alert(`Failed to send: ${data.error}`); }
+        } catch (err) { alert('Connection Error while sending.'); }
+    }
+
+    async function sendEstimate(id) {
+        if (!confirm(`Email Estimate #${id} to the client? (You will be automatically CC'd with the PDF attachment)`)) return;
+        try {
+            alert('Sending email... Please wait.');
+            const res = await fetch('/.netlify/functions/send-estimate', { method: 'POST', body: JSON.stringify({ id }) });
+            if (res.ok) { alert('Estimate successfully sent!'); loadDashboardData(); } 
+            else { const data = await res.json(); alert(`Failed to send: ${data.error}`); }
+        } catch (err) { alert('Connection Error while sending.'); }
     }
 
     // --- BUILDER & EDITING LOGIC ---
@@ -426,8 +426,10 @@
 
         document.getElementById('print-section').innerHTML = `
             <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
-                <h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Spotlight Tile LLC</h1>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 40px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <img src="https://spotlight-tile.com/logo.png" alt="Spotlight Tile LLC" style="max-height: 100px;">
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 40px; border-top: 2px solid #111; padding-top: 20px;">
                     <div><strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br><strong>Bill To:</strong> ${doc.client_name}<br>Email: ${doc.client_email || 'N/A'}<br>Phone: ${doc.client_phone || 'N/A'}</div>
                     <div style="text-align: right;"><strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br><strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}</div>
                 </div>
