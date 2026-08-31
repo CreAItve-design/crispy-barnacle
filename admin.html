@@ -137,9 +137,21 @@
                 </div>
 
                 <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
-                <table style="margin-bottom: 15px;"><thead><tr><th>Item / Scope</th><th>Qty</th><th>Set Piece Rate ($)</th><th>Total Payout</th></tr></thead><tbody id="po-lines"></tbody></table>
+                
+                <table style="margin-bottom: 15px; width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="width: 50%;">Item / Scope</th>
+                            <th style="width: 15%;">Qty</th>
+                            <th style="width: 15%;">Set Piece Rate ($)</th>
+                            <th style="width: 20%;">Total Payout</th>
+                        </tr>
+                    </thead>
+                    <tbody id="po-lines"></tbody>
+                </table>
+                
                 <h2 style="text-align: right; margin-bottom: 20px;">PO Total: $<span id="po-total">0.00</span></h2>
-                <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('po-builder-box').style.display='none'">Cancel</button> <button class="action-btn" style="background: #1565c0;" onclick="savePO()">Issue PO</button></div>
+                <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('po-builder-box').style.display='none'">Cancel</button> <button class="action-btn" style="background: #1565c0;" onclick="savePO()">Save PO</button></div>
             </div>
 
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px;">Invoices</h3>
@@ -188,7 +200,7 @@
 <script>
     let globalPrices = []; let globalClients = []; let globalInvoices = []; let globalEstimates = []; let globalPOs = [];
     let draftLines = []; let draftTotal = 0; let editingDocId = null; let editingDocType = null;
-    let poDraftLines = []; let poDraftTotal = 0; let currentInvForPO = null;
+    let poDraftLines = []; let poDraftTotal = 0; let currentInvForPO = null; let editingPOId = null;
 
     async function handleLogin(e) { e.preventDefault(); const res = await fetch('/.netlify/functions/admin-auth', { method: 'POST', body: JSON.stringify({ password: document.getElementById('admin-pass').value }) }); if (res.ok) { sessionStorage.setItem('spotlight_admin', 'true'); document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } else { document.getElementById('login-error').innerText = 'Incorrect password.'; } }
     window.onload = () => { if (sessionStorage.getItem('spotlight_admin') === 'true') { document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } };
@@ -290,6 +302,7 @@
                         <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${po.status || 'Issued'}</span></td>
                         <td><div style="display:flex; gap:4px; flex-wrap:wrap;">
                             <button onclick="printPO(${po.id})" class="action-btn" style="background:#444;">PDF</button> 
+                            <button onclick="editPO(${po.id})" class="action-btn" style="background:#f39c12;">Edit</button> 
                             <button onclick="sendPO(${po.id})" class="action-btn" style="background:#0288d1;">Send</button>
                             <button onclick="deletePO(${po.id})" class="action-btn" style="background:#c62828;">Del</button>
                         </div></td>
@@ -301,48 +314,76 @@
 
     // --- PURCHASE ORDER BUILDER ---
     function openPOBuilder(invoiceId) {
+        editingPOId = null;
         currentInvForPO = globalInvoices.find(i => i.id === invoiceId);
-        document.getElementById('po-builder-box').style.display = 'block';
-        document.getElementById('builder-box').style.display = 'none';
-        document.getElementById('po-client').innerText = currentInvForPO.client_name;
-        document.getElementById('po-address').innerText = currentInvForPO.client_address || 'N/A';
+        document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
+        document.getElementById('po-client').innerText = currentInvForPO.client_name; document.getElementById('po-address').innerText = currentInvForPO.client_address || 'N/A';
         ['po-ic-name', 'po-ic-email', 'po-ic-phone', 'po-labor-type', 'po-comments'].forEach(id => document.getElementById(id).value = '');
         
-        let linesHtml = ''; poDraftLines = [];
-        currentInvForPO.itemized_lines.forEach((item, idx) => {
+        poDraftLines = [];
+        currentInvForPO.itemized_lines.forEach((item) => {
             poDraftLines.push({ item_name: item.item_name, qty: item.qty, unit_price: 0, line_total: 0 });
-            linesHtml += `<tr><td>${item.item_name}</td><td>${item.qty}</td><td>$<input type="number" step="0.01" onchange="updatePOLine(${idx}, this.value)" style="width:80px; padding:4px;"></td><td id="po-lt-${idx}">$0.00</td></tr>`;
         });
-        document.getElementById('po-lines').innerHTML = linesHtml;
-        updatePOTotal();
+        renderPOLines();
         window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
     }
 
-    function updatePOLine(idx, val) {
-        let price = parseFloat(val) || 0;
-        poDraftLines[idx].unit_price = price;
-        poDraftLines[idx].line_total = price * poDraftLines[idx].qty;
-        document.getElementById(`po-lt-${idx}`).innerText = '$' + poDraftLines[idx].line_total.toFixed(2);
-        updatePOTotal();
+    function editPO(poId) {
+        const po = globalPOs.find(p => p.id === poId);
+        if (!po) return;
+        editingPOId = po.id;
+        currentInvForPO = { id: po.invoice_id }; // Keep reference
+        document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
+        document.getElementById('po-client').innerText = po.client_name; document.getElementById('po-address').innerText = po.client_address || 'N/A';
+        document.getElementById('po-ic-name').value = po.ic_name || ''; document.getElementById('po-ic-email').value = po.ic_email || ''; document.getElementById('po-ic-phone').value = po.ic_phone || '';
+        document.getElementById('po-labor-type').value = po.labor_type || ''; document.getElementById('po-comments').value = po.comments || '';
+        
+        poDraftLines = [...po.itemized_lines];
+        renderPOLines();
+        window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
     }
-    
-    function updatePOTotal() {
-        poDraftTotal = poDraftLines.reduce((sum, item) => sum + item.line_total, 0);
+
+    function renderPOLines() {
+        const tbody = document.getElementById('po-lines');
+        tbody.innerHTML = ''; poDraftTotal = 0;
+        poDraftLines.forEach((item, idx) => {
+            const price = item.unit_price || 0;
+            const qty = item.qty || 0;
+            const lineTotal = price * qty;
+            poDraftTotal += lineTotal;
+            poDraftLines[idx].line_total = lineTotal; // sync array state
+            
+            tbody.innerHTML += `<tr>
+                <td><input type="text" value="${item.item_name.replace(/"/g, '&quot;')}" onchange="updatePOLine(${idx}, 'name', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                <td><input type="number" step="0.1" value="${qty}" onchange="updatePOLine(${idx}, 'qty', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                <td>$<input type="number" step="0.01" value="${price}" onchange="updatePOLine(${idx}, 'price', this.value)" style="width:80%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
+                <td style="font-weight:bold;">$${lineTotal.toFixed(2)} <button onclick="removePOLine(${idx})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td>
+            </tr>`;
+        });
         document.getElementById('po-total').innerText = poDraftTotal.toFixed(2);
     }
 
+    function updatePOLine(idx, field, val) {
+        if (field === 'name') poDraftLines[idx].item_name = val;
+        if (field === 'qty') poDraftLines[idx].qty = parseFloat(val) || 0;
+        if (field === 'price') poDraftLines[idx].unit_price = parseFloat(val) || 0;
+        renderPOLines();
+    }
+    
+    function removePOLine(idx) { poDraftLines.splice(idx, 1); renderPOLines(); }
+
     async function savePO() {
         const ic_name = document.getElementById('po-ic-name').value;
-        if (!ic_name) return alert('Contractor name required.');
+        if (!ic_name || poDraftLines.length === 0) return alert('Contractor name and at least one line item required.');
         const payload = {
-            invoice_id: currentInvForPO.id, ic_name, 
-            ic_email: document.getElementById('po-ic-email').value,
-            ic_phone: document.getElementById('po-ic-phone').value,
-            client_name: currentInvForPO.client_name, client_address: currentInvForPO.client_address,
+            invoice_id: currentInvForPO ? currentInvForPO.id : null, ic_name, 
+            ic_email: document.getElementById('po-ic-email').value, ic_phone: document.getElementById('po-ic-phone').value,
+            client_name: document.getElementById('po-client').innerText, client_address: document.getElementById('po-address').innerText,
             labor_type: document.getElementById('po-labor-type').value, comments: document.getElementById('po-comments').value,
             itemized_lines: poDraftLines, total_amount: poDraftTotal, status: 'Issued'
         };
-        await fetch('/.netlify/functions/manage-pos', { method: 'POST', body: JSON.stringify(payload) });
+        if (editingPOId) payload.id = editingPOId;
+        await fetch('/.netlify/functions/manage-pos', { method: editingPOId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
         document.getElementById('po-builder-box').style.display = 'none'; loadDashboardData();
     }
 
@@ -351,8 +392,7 @@
         alert('Sending PO... Please wait.');
         try {
             const res = await fetch('/.netlify/functions/send-po', { method: 'POST', body: JSON.stringify({ id }) });
-            if (res.ok) { alert('PO Sent!'); loadDashboardData(); } 
-            else { const data = await res.json(); alert(`Failed to send: ${data.error}`); }
+            if (res.ok) { alert('PO Sent!'); loadDashboardData(); } else { const data = await res.json(); alert(`Failed to send: ${data.error}`); }
         } catch(e) { alert('Connection Error.'); }
     }
 

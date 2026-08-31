@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 exports.handler = async (event) => {
     const method = event.httpMethod;
     try {
@@ -9,6 +10,11 @@ exports.handler = async (event) => {
         }
         if (method === 'POST') {
             const { error } = await supabase.from('purchase_orders').insert([JSON.parse(event.body)]);
+            if (error) throw error; return { statusCode: 200, body: JSON.stringify({ success: true }) };
+        }
+        if (method === 'PUT') {
+            const payload = JSON.parse(event.body);
+            const { error } = await supabase.from('purchase_orders').update(payload).eq('id', payload.id);
             if (error) throw error; return { statusCode: 200, body: JSON.stringify({ success: true }) };
         }
         if (method === 'DELETE') {
