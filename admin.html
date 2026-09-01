@@ -28,12 +28,11 @@
         .toolbar { display: flex; gap: 15px; align-items: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #e5e5e5; margin-bottom: 20px; flex-wrap: wrap; }
         .flag-box { background: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: none; font-weight: bold; }
         
-        /* Strict PDF Print Layout Rules */
         @media print {
             @page { size: letter portrait; margin: 0.5in; }
-            body * { display: none !important; }
-            #print-section, #print-section * { display: block !important; }
-            #print-section { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; background: white; }
+            body.admin-body { background: white !important; padding: 0 !important; margin: 0 !important; }
+            #login-screen, #dashboard-screen { display: none !important; }
+            #print-section { display: block !important; position: static; width: 100%; padding: 0; margin: 0; }
         }
     </style>
 </head>
@@ -67,15 +66,34 @@
         <div id="tab-pnl" class="tab-content active">
             <h2>Financial Reports</h2>
             <div id="1099-flags" class="flag-box"></div>
+            
             <div class="toolbar">
-                <strong style="margin-right: 10px;">Filter Dates (For Taxes):</strong>
+                <strong style="margin-right: 10px;">Filter Dates:</strong>
                 <input type="date" id="pnl-start" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;"> <span>to</span>
                 <input type="date" id="pnl-end" style="padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                <button class="action-btn" onclick="loadDashboardData()" style="background: #2e7d32;">Apply Filter</button>
+                <button class="action-btn" onclick="loadDashboardData()" style="background: #2e7d32;">Apply</button>
                 <div style="flex-grow: 1;"></div>
+                <button class="action-btn" onclick="document.getElementById('import-box').style.display='block'" style="background: #f39c12;">Import Old Data</button>
                 <button class="action-btn" onclick="printPnL()" style="background: #444;">Print / PDF</button>
                 <button class="action-btn" onclick="emailPnL()" style="background: #0288d1;">Email Report</button>
             </div>
+
+            <!-- HISTORICAL DATA IMPORT BUILDER -->
+            <div id="import-box" class="builder-box" style="display: none; background: #fff3e0; border-color: #ffb74d;">
+                <h3 style="color: #e65100; margin-bottom: 10px;">Import Historical Data (CSV)</h3>
+                <p style="font-size: 0.9rem; margin-bottom: 15px; color:#555;">Upload old invoices or expenses so they map to your historical P&L.</p>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
+                    <select id="import-type" style="padding: 8px; flex: 1; border: 1px solid #ccc; border-radius: 4px;">
+                        <option value="invoices">Import Invoices</option>
+                        <option value="expenses">Import Expenses</option>
+                    </select>
+                    <button class="action-btn" style="background: #444;" onclick="downloadImportTemplate()">1. Download Template</button>
+                    <input type="file" id="csv-file" accept=".csv" style="flex: 2; padding: 5px; background: #fff; border: 1px solid #ccc; border-radius: 4px;">
+                    <button class="action-btn" style="background: #e65100;" onclick="processImport()">2. Upload & Import</button>
+                </div>
+                <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('import-box').style.display='none'">Close</button></div>
+            </div>
+
             <div class="stats-grid">
                 <div class="stat-card"><h3>Total Revenue</h3><p id="pnl-revenue">$0.00</p></div>
                 <div class="stat-card"><h3>Total Expenses</h3><p id="pnl-expenses">$0.00</p></div>
@@ -107,7 +125,7 @@
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <input type="text" id="b-address" placeholder="Property Address" style="flex:2; padding:8px;">
-                    <input type="text" id="b-project" placeholder="Project Type (Estimates Only)" style="flex:1; padding:8px;">
+                    <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
                     <input type="text" id="b-po" placeholder="PO / Job Name" style="flex:1; padding:8px;">
                 </div>
                 <textarea id="b-comments" rows="2" placeholder="Notes / Comments for Client..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
@@ -116,16 +134,14 @@
                     <input type="number" id="b-deposit" value="0" step="0.01" style="padding:8px; width: 120px;">
                 </div>
                 
-                <!-- DUAL ITEM ADDER (Standard + Custom) -->
+                <!-- DUAL ITEM ADDER -->
                 <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd; margin-bottom: 15px;">
-                    <!-- Standard Item -->
                     <div style="display: flex; gap: 10px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 10px;">
                         <strong style="min-width: 130px;">Price Sheet Item:</strong>
                         <select id="b-item-select" style="flex:2; padding:8px;"><option value="">-- Select Material / Labor --</option></select>
                         <input type="number" id="b-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
                         <button class="action-btn" onclick="addLineItem()">Add</button>
                     </div>
-                    <!-- Custom Item -->
                     <div style="display: flex; gap: 10px; align-items: center;">
                         <strong style="min-width: 130px; color:#d35400;">Custom Item:</strong>
                         <input type="text" id="b-custom-name" placeholder="Custom Desc. (e.g., Family Discount)" style="flex:2; padding:8px;">
@@ -155,14 +171,7 @@
                 </div>
                 <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
                 <table style="margin-bottom: 15px; width: 100%;">
-                    <thead>
-                        <tr>
-                            <th style="width: 50%;">Item / Scope</th>
-                            <th style="width: 15%;">Qty</th>
-                            <th style="width: 15%;">Set Piece Rate ($)</th>
-                            <th style="width: 20%;">Total Payout</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th style="width: 50%;">Item / Scope</th><th style="width: 15%;">Qty</th><th style="width: 15%;">Set Piece Rate ($)</th><th style="width: 20%;">Total Payout</th></tr></thead>
                     <tbody id="po-lines"></tbody>
                 </table>
                 <h2 style="text-align: right; margin-bottom: 20px;">PO Total: $<span id="po-total">0.00</span></h2>
@@ -193,12 +202,12 @@
             <div id="add-price-box" class="builder-box" style="display: none; background: #e8f5e9; border-color: #a5d6a7;">
                 <h3 style="margin-bottom: 15px; color:#2e7d32;">Add New Price Sheet Item</h3>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="new-item-name" placeholder="Item Name (e.g., Premium Ceramic Tile)" style="flex:2; padding:8px;" required>
+                    <input type="text" id="new-item-name" placeholder="Item Name" style="flex:2; padding:8px;" required>
                     <input type="text" id="new-item-cat" list="price-categories" placeholder="Category" style="flex:1; padding:8px;" required>
                     <datalist id="price-categories"><option value="Labor"><option value="Substrate & Backer"><option value="Setting Materials"><option value="Grout"><option value="Valves & Drains"><option value="Trims & Profiles"><option value="Fittings & Supplies"><option value="Installation Tools"></datalist>
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="new-item-unit" placeholder="Cost Unit (e.g., per sq ft, each, bag)" style="flex:1; padding:8px;" required>
+                    <input type="text" id="new-item-unit" placeholder="Cost Unit" style="flex:1; padding:8px;" required>
                     <div style="display: flex; align-items: center; gap: 5px; flex:1;"><span style="font-weight:bold;">$</span><input type="number" id="new-item-price" step="0.01" placeholder="Base Cost (No Markup)" style="width:100%; padding:8px;" required></div>
                 </div>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('add-price-box').style.display='none'">Cancel</button> <button class="action-btn" style="background: #2e7d32;" onclick="saveNewPrice()">Save Item</button></div>
@@ -434,6 +443,75 @@
 
     async function deletePO(id) { if(confirm('Delete PO?')) { await fetch('/.netlify/functions/manage-pos', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
 
+    // --- HISTORICAL BULK IMPORTER ---
+    function downloadImportTemplate() {
+        const type = document.getElementById('import-type').value;
+        const csv = type === 'invoices' 
+            ? "Date (YYYY-MM-DD),Client Name,Address,Total Amount,Deposit Paid,Status (Paid/Unpaid),Notes\n2025-06-15,John Doe,123 Main St,5000,5000,Paid,Historical Import" 
+            : "Date (YYYY-MM-DD),Category,Vendor,Amount,Description\n2025-06-15,Tools & Equipment,Home Depot,250.50,Saw blades";
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Spotlight_Import_Template_${type}.csv`;
+        link.click();
+    }
+
+    // A robust CSV parser to handle quotes and commas inside columns
+    function parseCSVRow(str) {
+        let arr = [], quote = false, row = '';
+        for (let c = 0; c < str.length; c++) {
+            let cc = str[c], nc = str[c+1];
+            if (cc === '"' && quote && nc === '"') { row += cc; c++; continue; }
+            if (cc === '"') { quote = !quote; continue; }
+            if (cc === ',' && !quote) { arr.push(row); row = ''; continue; }
+            row += cc;
+        }
+        arr.push(row.trim());
+        return arr;
+    }
+
+    async function processImport() {
+        const type = document.getElementById('import-type').value;
+        const file = document.getElementById('csv-file').files[0];
+        if (!file) return alert("Please select a CSV file first.");
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const rows = e.target.result.split('\n');
+            const records = [];
+
+            for (let i = 1; i < rows.length; i++) {
+                if (rows[i].trim() === '') continue;
+                const cols = parseCSVRow(rows[i]);
+
+                if (type === 'invoices') {
+                    if (cols.length < 4) continue;
+                    records.push({
+                        created_at: new Date(cols[0]).toISOString(),
+                        client_name: cols[1], client_address: cols[2] || '',
+                        total_amount: parseFloat(cols[3]) || 0, deposit_paid: parseFloat(cols[4]) || 0,
+                        status: cols[5] || 'Paid', comments: cols[6] || 'Historical Import',
+                        itemized_lines: [{ item_name: "Historical Import Record", qty: 1, unit_price: parseFloat(cols[3]) || 0, line_total: parseFloat(cols[3]) || 0, base_cost: 0 }]
+                    });
+                } else {
+                    if (cols.length < 4) continue;
+                    records.push({
+                        created_at: new Date(cols[0]).toISOString(),
+                        category: cols[1], vendor_name: cols[2] || '',
+                        amount: parseFloat(cols[3]) || 0, description: cols[4] || 'Historical Import'
+                    });
+                }
+            }
+
+            if (records.length === 0) return alert("No valid rows found to import.");
+
+            try {
+                const res = await fetch('/.netlify/functions/import-data', { method: 'POST', body: JSON.stringify({ table: type, records }) });
+                if (res.ok) { alert(`Successfully imported ${records.length} historical records!`); document.getElementById('import-box').style.display = 'none'; loadDashboardData(); } 
+                else { const err = await res.json(); alert(`Import failed: ${err.error}`); }
+            } catch (err) { alert("Connection error."); }
+        };
+        reader.readAsText(file);
+    }
+
     // --- CLIENT BUILDER ---
     function resetBuilder() {
         editingDocId = null; editingDocType = null; document.querySelector('input[value="Estimate"]').checked = true; toggleDeposit('Estimate');
@@ -522,7 +600,7 @@
         </tr>`).join('');
         
         const depositAmt = parseFloat(doc.deposit_paid || 0);
-        const balHtml = docType === 'Invoice' ? `<h4 style="color:#c62828; margin:5px 0;">Less Deposit Paid: -$${depositAmt.toFixed(2)}</h4><h2 style="color:#111;">Balance Due: $${(doc.total_amount - depositAmt).toFixed(2)}</h2>` : '';
+        const balHtml = docType === 'Invoice' && depositAmt > 0 ? `<h4 style="color:#c62828; margin:5px 0;">Less Deposit Paid: -$${depositAmt.toFixed(2)}</h4><h2 style="color:#111;">Balance Due: $${(doc.total_amount - depositAmt).toFixed(2)}</h2>` : '';
         const cmtHtml = doc.comments ? `<div style="margin-top:20px; padding:15px; background:#f9f9f9; border-left:4px solid #111;"><strong>Notes:</strong><br>${doc.comments}</div>` : '';
         
         document.getElementById('print-section').innerHTML = `
