@@ -7,19 +7,15 @@ exports.handler = async (event) => {
 
     try {
         const { id } = JSON.parse(event.body);
-
-        // 1. Fetch the invoice from the database
         const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
         const { data: invoice, error } = await supabase.from('invoices').select('*').eq('id', id).single();
 
         if (error || !invoice) throw new Error('Invoice not found');
 
-// 2. Draw the PDF in server memory
         const doc = new PDFDocument({ margin: 50 });
         let buffers = [];
         doc.on('data', buffers.push.bind(buffers));
 
-        // Fetch & Add Logo to PDF
         let logoBuffer;
         try {
             const res = await fetch('https://spotlight-tile.com/image.png');
@@ -34,16 +30,16 @@ exports.handler = async (event) => {
         }
 
         doc.fontSize(16).text(`INVOICE #${invoice.id}`);
-        // ... (Leave the rest of the file exactly the same)        
+        doc.fontSize(10).text(`Date: ${new Date(invoice.created_at || invoice.issue_date || new Date()).toLocaleDateString()}`);
         doc.moveDown();
         
         doc.text(`Bill To: ${invoice.client_name}`);
         if (invoice.client_email) doc.text(`Email: ${invoice.client_email}`);
         if (invoice.client_phone) doc.text(`Phone: ${invoice.client_phone}`);
+        if (invoice.client_address) doc.text(`Address: ${invoice.client_address}`);
         if (invoice.po_job_name) doc.text(`Project / PO: ${invoice.po_job_name}`);
         doc.moveDown(2);
 
-        // PDF Table Headers
         const tableTop = doc.y;
         doc.font('Helvetica-Bold');
         doc.text('Item Description', 50, tableTop);
@@ -51,7 +47,6 @@ exports.handler = async (event) => {
         doc.text('Line Total', 420, tableTop, { width: 80, align: 'right' });
         doc.moveTo(50, tableTop + 15).lineTo(500, tableTop + 15).stroke();
         
-        // PDF Table Rows
         doc.font('Helvetica');
         let y = tableTop + 25;
         invoice.itemized_lines.forEach(item => {
@@ -61,7 +56,6 @@ exports.handler = async (event) => {
             y += 20;
         });
 
-        // PDF Totals
         doc.moveTo(50, y + 10).lineTo(500, y + 10).stroke();
         y += 20;
         
@@ -79,34 +73,41 @@ exports.handler = async (event) => {
         doc.fontSize(14).font('Helvetica-Bold');
         doc.text(`Balance Due: $${(invoice.total_amount - deposit).toFixed(2)}`, 250, y, { width: 250, align: 'right' });
 
-        doc.end(); // Finish drawing
+        // --- DRAW COMMENTS TO PDF ---
+        if (invoice.comments) {
+            y += 40;
+            doc.fontSize(10).font('Helvetica-Bold').text('Notes / Instructions:', 50, y);
+            doc.font('Helvetica').text(invoice.comments, 50, y + 15, { width: 450 });
+        }
 
-        // Convert drawing to an actual file buffer
+        doc.end();
+
         const pdfBuffer = await new Promise((resolve) => {
             doc.on('end', () => { resolve(Buffer.concat(buffers)); });
         });
 
-        // 3. Send the Email with the PDF Attached
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
             const transporter = nodemailer.createTransport({
                 service: 'gmail',
                 auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
             });
 
-            // If the client doesn't have an email on file, send it directly to Richard
             const sendTo = invoice.client_email ? invoice.client_email : process.env.EMAIL_USER;
             
             await transporter.sendMail({
                 from: `"Spotlight Tile LLC" <${process.env.EMAIL_USER}>`,
                 to: sendTo,
-                cc: process.env.EMAIL_USER, // Automatically CC Richard
+                cc: process.env.EMAIL_USER,
                 subject: `Invoice #${invoice.id} - Spotlight Tile LLC`,
                 html: `
                     <div style="font-family: sans-serif; padding: 20px;">
                         <h2>Hello ${invoice.client_name},</h2>
                         <p>Thank you for choosing Spotlight Tile LLC. Please find your detailed invoice attached to this email as a PDF.</p>
                         <p><strong>Total Balance Due: $${(invoice.total_amount - deposit).toFixed(2)}</strong></p>
-                        <p>If you have any questions or concerns, please reply directly to this email.</p>
+                        
+                        ${invoice.comments ? `<div style="background:#f9f9f9; padding:15px; margin-top:20px; border-left:4px solid #111;"><strong>Notes:</strong><br>${invoice.comments.replace(/\n/g, '<br>')}</div>` : ''}
+                        
+                        <p style="margin-top:20px;">If you have any questions or concerns, please reply directly to this email.</p>
                         <br>
                         <p>Best regards,<br>Spotlight Tile LLC</p>
                     </div>

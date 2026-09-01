@@ -10,12 +10,10 @@ exports.handler = async (event) => {
         const { data: est, error } = await supabase.from('estimates').select('*').eq('id', id).single();
         if (error || !est) throw new Error('Estimate not found');
 
-        // Draw PDF
         const doc = new PDFDocument({ margin: 50 });
         let buffers = [];
         doc.on('data', buffers.push.bind(buffers));
 
-        // Fetch & Add Logo to PDF
         let logoBuffer;
         try {
             const res = await fetch('https://spotlight-tile.com/image.png');
@@ -24,7 +22,7 @@ exports.handler = async (event) => {
 
         if (logoBuffer) {
             doc.image(logoBuffer, (doc.page.width - 160) / 2, 50, { width: 160 });
-            doc.y = 130; // Push text down below the logo
+            doc.y = 130; 
         } else {
             doc.fontSize(22).text('Spotlight Tile LLC', { align: 'center' }).moveDown();
         }
@@ -35,6 +33,7 @@ exports.handler = async (event) => {
         doc.text(`Prepared For: ${est.client_name}`);
         if (est.client_email) doc.text(`Email: ${est.client_email}`);
         if (est.client_phone) doc.text(`Phone: ${est.client_phone}`);
+        if (est.client_address) doc.text(`Address: ${est.client_address}`);
         if (est.project_type) doc.text(`Project: ${est.project_type}`);
         if (est.po_job_name) doc.text(`PO/Job Name: ${est.po_job_name}`);
         doc.moveDown(2);
@@ -59,14 +58,20 @@ exports.handler = async (event) => {
         y += 20;
         doc.font('Helvetica-Bold').fontSize(14);
         doc.text(`Estimate Total: $${est.total_amount.toFixed(2)}`, 250, y, { width: 250, align: 'right' });
+
+        // --- DRAW COMMENTS TO PDF ---
+        if (est.comments) {
+            y += 40;
+            doc.fontSize(10).font('Helvetica-Bold').text('Notes / Instructions:', 50, y);
+            doc.font('Helvetica').text(est.comments, 50, y + 15, { width: 450 });
+        }
+
         doc.end();
 
         const pdfBuffer = await new Promise(resolve => { doc.on('end', () => resolve(Buffer.concat(buffers))); });
 
-        // Update Database to "Sent"
         await supabase.from('estimates').update({ status: 'Sent' }).eq('id', id);
 
-        // Send Email
         if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
             const transporter = nodemailer.createTransport({ service: 'gmail', auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }});
             const sendTo = est.client_email ? est.client_email : process.env.EMAIL_USER;
@@ -87,6 +92,9 @@ exports.handler = async (event) => {
                         <tbody>${itemsHtml}</tbody>
                     </table>
                     <h3 style="text-align: right; margin-top: 20px;">Total: $${est.total_amount.toFixed(2)}</h3>
+                    
+                    ${est.comments ? `<div style="background:#f9f9f9; padding:15px; margin-top:20px; border-left:4px solid #111;"><strong>Notes:</strong><br>${est.comments.replace(/\n/g, '<br>')}</div>` : ''}
+                    
                     <div style="text-align: center; margin-top: 40px;">
                         <a href="${acceptLink}" style="background-color: #2e7d32; color: #ffffff; padding: 15px 30px; text-decoration: none; font-weight: bold; border-radius: 6px; display: inline-block;">Accept Estimate</a>
                     </div>
