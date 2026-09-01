@@ -105,7 +105,7 @@
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <input type="text" id="b-address" placeholder="Property Address" style="flex:2; padding:8px;">
-                    <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
+                    <input type="text" id="b-project" placeholder="Project Type (Estimates Only)" style="flex:1; padding:8px;">
                     <input type="text" id="b-po" placeholder="PO / Job Name" style="flex:1; padding:8px;">
                 </div>
                 <textarea id="b-comments" rows="2" placeholder="Notes / Comments for Client..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
@@ -113,11 +113,28 @@
                     <label style="font-weight: bold;">Initial Deposit Paid: $</label>
                     <input type="number" id="b-deposit" value="0" step="0.01" style="padding:8px; width: 120px;">
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd;">
-                    <select id="b-item-select" style="flex:2; padding:8px;"><option value="">-- Select Material / Labor --</option></select>
-                    <input type="number" id="b-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
-                    <button class="action-btn" onclick="addLineItem()">Add Line</button>
+                
+                <!-- DUAL ITEM ADDER (Standard + Custom) -->
+                <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd; margin-bottom: 15px;">
+                    <!-- Standard Item -->
+                    <div style="display: flex; gap: 10px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 10px;">
+                        <strong style="min-width: 130px;">Price Sheet Item:</strong>
+                        <select id="b-item-select" style="flex:2; padding:8px;"><option value="">-- Select Material / Labor --</option></select>
+                        <input type="number" id="b-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
+                        <button class="action-btn" onclick="addLineItem()">Add</button>
+                    </div>
+                    <!-- Custom Item -->
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <strong style="min-width: 130px; color:#d35400;">Custom Item:</strong>
+                        <input type="text" id="b-custom-name" placeholder="Custom Desc. (e.g., Family Discount)" style="flex:2; padding:8px;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            $ <input type="number" id="b-custom-price" placeholder="Unit Price" style="width: 90px; padding:8px;" step="0.01">
+                        </div>
+                        <input type="number" id="b-custom-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
+                        <button class="action-btn" style="background:#e67e22;" onclick="addCustomLineItem()">Add Custom</button>
+                    </div>
                 </div>
+
                 <table style="margin-bottom: 15px;"><thead><tr><th>Item</th><th>Qty</th><th>Client Price</th><th>Line Total</th></tr></thead><tbody id="b-lines"></tbody></table>
                 <h2 style="text-align: right; margin-bottom: 20px;">Total: $<span id="b-total">0.00</span></h2>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="resetBuilder()">Cancel</button> <button class="action-btn" style="background: #2e7d32;" onclick="saveDocument()">Save Document</button></div>
@@ -171,40 +188,20 @@
                 </div>
             </div>
 
-            <!-- ADD NEW PRICE BUILDER -->
             <div id="add-price-box" class="builder-box" style="display: none; background: #e8f5e9; border-color: #a5d6a7;">
                 <h3 style="margin-bottom: 15px; color:#2e7d32;">Add New Price Sheet Item</h3>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <input type="text" id="new-item-name" placeholder="Item Name (e.g., Premium Ceramic Tile)" style="flex:2; padding:8px;" required>
                     <input type="text" id="new-item-cat" list="price-categories" placeholder="Category" style="flex:1; padding:8px;" required>
-                    <datalist id="price-categories">
-                        <option value="Labor">
-                        <option value="Substrate & Backer">
-                        <option value="Setting Materials">
-                        <option value="Grout">
-                        <option value="Valves & Drains">
-                        <option value="Trims & Profiles">
-                        <option value="Fittings & Supplies">
-                        <option value="Installation Tools">
-                    </datalist>
+                    <datalist id="price-categories"><option value="Labor"><option value="Substrate & Backer"><option value="Setting Materials"><option value="Grout"><option value="Valves & Drains"><option value="Trims & Profiles"><option value="Fittings & Supplies"><option value="Installation Tools"></datalist>
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <input type="text" id="new-item-unit" placeholder="Cost Unit (e.g., per sq ft, each, bag)" style="flex:1; padding:8px;" required>
-                    <div style="display: flex; align-items: center; gap: 5px; flex:1;">
-                        <span style="font-weight:bold;">$</span>
-                        <input type="number" id="new-item-price" step="0.01" placeholder="Base Cost (No Markup)" style="width:100%; padding:8px;" required>
-                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px; flex:1;"><span style="font-weight:bold;">$</span><input type="number" id="new-item-price" step="0.01" placeholder="Base Cost (No Markup)" style="width:100%; padding:8px;" required></div>
                 </div>
-                <div style="text-align: right;">
-                    <button class="action-btn" style="background: #666;" onclick="document.getElementById('add-price-box').style.display='none'">Cancel</button>
-                    <button class="action-btn" style="background: #2e7d32;" onclick="saveNewPrice()">Save Item</button>
-                </div>
+                <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('add-price-box').style.display='none'">Cancel</button> <button class="action-btn" style="background: #2e7d32;" onclick="saveNewPrice()">Save Item</button></div>
             </div>
-
-            <table>
-                <thead><tr><th>Item Name</th><th>Category</th><th>Cost Unit</th><th>Base Cost ($)</th></tr></thead>
-                <tbody id="prices-table-body"><tr><td colspan="4">Loading price sheet...</td></tr></tbody>
-            </table>
+            <table><thead><tr><th>Item Name</th><th>Category</th><th>Cost Unit</th><th>Base Cost ($)</th></tr></thead><tbody id="prices-table-body"><tr><td colspan="4">Loading price sheet...</td></tr></tbody></table>
         </div>
 
         <!-- TAB 4: LOG EXPENSES -->
@@ -358,44 +355,26 @@
         ['po-ic-name', 'po-ic-email', 'po-ic-phone', 'po-labor-type', 'po-comments'].forEach(id => document.getElementById(id).value = '');
         
         poDraftLines = [];
-        currentInvForPO.itemized_lines.forEach((item) => {
-            poDraftLines.push({ item_name: item.item_name, qty: item.qty, unit_price: 0, line_total: 0 });
-        });
-        renderPOLines();
-        window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
+        currentInvForPO.itemized_lines.forEach((item) => { poDraftLines.push({ item_name: item.item_name, qty: item.qty, unit_price: 0, line_total: 0 }); });
+        renderPOLines(); window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
     }
 
     function editPO(poId) {
-        const po = globalPOs.find(p => p.id === poId);
-        if (!po) return;
-        editingPOId = po.id;
-        currentInvForPO = { id: po.invoice_id }; 
+        const po = globalPOs.find(p => p.id === poId); if (!po) return;
+        editingPOId = po.id; currentInvForPO = { id: po.invoice_id }; 
         document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
         document.getElementById('po-client').innerText = po.client_name; document.getElementById('po-address').innerText = po.client_address || 'N/A';
         document.getElementById('po-ic-name').value = po.ic_name || ''; document.getElementById('po-ic-email').value = po.ic_email || ''; document.getElementById('po-ic-phone').value = po.ic_phone || '';
         document.getElementById('po-labor-type').value = po.labor_type || ''; document.getElementById('po-comments').value = po.comments || '';
-        
-        poDraftLines = [...po.itemized_lines];
-        renderPOLines();
-        window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
+        poDraftLines = [...po.itemized_lines]; renderPOLines(); window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
     }
 
     function renderPOLines() {
-        const tbody = document.getElementById('po-lines');
-        tbody.innerHTML = ''; poDraftTotal = 0;
+        const tbody = document.getElementById('po-lines'); tbody.innerHTML = ''; poDraftTotal = 0;
         poDraftLines.forEach((item, idx) => {
-            const price = item.unit_price || 0;
-            const qty = item.qty || 0;
-            const lineTotal = price * qty;
-            poDraftTotal += lineTotal;
-            poDraftLines[idx].line_total = lineTotal; 
-            
-            tbody.innerHTML += `<tr>
-                <td><input type="text" value="${item.item_name.replace(/"/g, '&quot;')}" onchange="updatePOLine(${idx}, 'name', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                <td><input type="number" step="0.1" value="${qty}" onchange="updatePOLine(${idx}, 'qty', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                <td>$<input type="number" step="0.01" value="${price}" onchange="updatePOLine(${idx}, 'price', this.value)" style="width:80%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                <td style="font-weight:bold;">$${lineTotal.toFixed(2)} <button onclick="removePOLine(${idx})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td>
-            </tr>`;
+            const price = item.unit_price || 0; const qty = item.qty || 0; const lineTotal = price * qty;
+            poDraftTotal += lineTotal; poDraftLines[idx].line_total = lineTotal; 
+            tbody.innerHTML += `<tr><td><input type="text" value="${item.item_name.replace(/"/g, '&quot;')}" onchange="updatePOLine(${idx}, 'name', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td><td><input type="number" step="0.1" value="${qty}" onchange="updatePOLine(${idx}, 'qty', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td><td>$<input type="number" step="0.01" value="${price}" onchange="updatePOLine(${idx}, 'price', this.value)" style="width:80%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td><td style="font-weight:bold;">$${lineTotal.toFixed(2)} <button onclick="removePOLine(${idx})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td></tr>`;
         });
         document.getElementById('po-total').innerText = poDraftTotal.toFixed(2);
     }
@@ -412,13 +391,7 @@
     async function savePO() {
         const ic_name = document.getElementById('po-ic-name').value;
         if (!ic_name || poDraftLines.length === 0) return alert('Contractor name and at least one line item required.');
-        const payload = {
-            invoice_id: currentInvForPO ? currentInvForPO.id : null, ic_name, 
-            ic_email: document.getElementById('po-ic-email').value, ic_phone: document.getElementById('po-ic-phone').value,
-            client_name: document.getElementById('po-client').innerText, client_address: document.getElementById('po-address').innerText,
-            labor_type: document.getElementById('po-labor-type').value, comments: document.getElementById('po-comments').value,
-            itemized_lines: poDraftLines, total_amount: poDraftTotal, status: 'Issued'
-        };
+        const payload = { invoice_id: currentInvForPO ? currentInvForPO.id : null, ic_name, ic_email: document.getElementById('po-ic-email').value, ic_phone: document.getElementById('po-ic-phone').value, client_name: document.getElementById('po-client').innerText, client_address: document.getElementById('po-address').innerText, labor_type: document.getElementById('po-labor-type').value, comments: document.getElementById('po-comments').value, itemized_lines: poDraftLines, total_amount: poDraftTotal, status: 'Issued' };
         if (editingPOId) payload.id = editingPOId;
         await fetch('/.netlify/functions/manage-pos', { method: editingPOId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
         document.getElementById('po-builder-box').style.display = 'none'; loadDashboardData();
@@ -427,19 +400,18 @@
     async function sendPO(id) {
         if (!confirm(`Email PO #${id} to the contractor? (You will be automatically CC'd)`)) return;
         alert('Sending PO... Please wait.');
-        try {
-            const res = await fetch('/.netlify/functions/send-po', { method: 'POST', body: JSON.stringify({ id }) });
-            if (res.ok) { alert('PO Sent!'); loadDashboardData(); } else { const data = await res.json(); alert(`Failed to send: ${data.error}`); }
-        } catch(e) { alert('Connection Error.'); }
+        try { const res = await fetch('/.netlify/functions/send-po', { method: 'POST', body: JSON.stringify({ id }) }); if (res.ok) { alert('PO Sent!'); loadDashboardData(); } else { const data = await res.json(); alert(`Failed to send: ${data.error}`); } } catch(e) { alert('Connection Error.'); }
     }
-
     async function deletePO(id) { if(confirm('Delete PO?')) { await fetch('/.netlify/functions/manage-pos', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
 
     // --- CLIENT BUILDER ---
     function resetBuilder() {
         editingDocId = null; editingDocType = null; document.querySelector('input[value="Estimate"]').checked = true; toggleDeposit('Estimate');
         document.getElementById('builder-box').style.display = 'none'; draftLines = []; renderDraftLines();
-        ['b-name', 'b-email', 'b-phone', 'b-address', 'b-project', 'b-po', 'b-comments'].forEach(id => document.getElementById(id).value = '');
+        ['b-name', 'b-email', 'b-phone', 'b-address', 'b-project', 'b-po', 'b-comments', 'b-custom-name', 'b-custom-price', 'b-custom-qty'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
         document.getElementById('b-deposit').value = '0'; document.getElementById('b-msg').innerText = '';
     }
     
@@ -463,6 +435,7 @@
         document.getElementById('b-total').innerText = draftTotal.toFixed(2);
     }
 
+    // Standard Addition
     function addLineItem() {
         const selectId = document.getElementById('b-item-select').value; const qty = parseFloat(document.getElementById('b-qty').value);
         if (!selectId || !qty || qty <= 0 || isNaN(qty)) return alert("Select item and valid quantity.");
@@ -472,39 +445,50 @@
         draftLines.push({ item_name: item.item_name, category: item.category, qty: qty, base_cost: item.unit_price, unit_price: clientUnitPrice, line_total: clientUnitPrice * qty });
         renderDraftLines();
     }
+    
+    // Custom Addition
+    function addCustomLineItem() {
+        const name = document.getElementById('b-custom-name').value;
+        const price = parseFloat(document.getElementById('b-custom-price').value);
+        const qty = parseFloat(document.getElementById('b-custom-qty').value);
+        if (!name || isNaN(price) || isNaN(qty) || qty <= 0) return alert("Please enter a custom name, price, and valid quantity.");
+        
+        draftLines.push({ item_name: name, category: "Custom / Special", qty: qty, base_cost: price, unit_price: price, line_total: price * qty });
+        document.getElementById('b-custom-name').value = ''; document.getElementById('b-custom-price').value = ''; document.getElementById('b-custom-qty').value = '';
+        renderDraftLines();
+    }
+    
     function removeLine(index) { draftLines.splice(index, 1); renderDraftLines(); }
 
     async function saveDocument() {
         const docType = document.querySelector('input[name="doc_type"]:checked').value; const client_name = document.getElementById('b-name').value;
-        if (!client_name || draftLines.length === 0) return alert('Name and line item required.');
-        const payload = { client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, client_address: document.getElementById('b-address').value, comments: document.getElementById('b-comments').value, po_job_name: document.getElementById('b-po').value, project_type: document.getElementById('b-project').value, deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), itemized_lines: draftLines, total_amount: draftTotal };
+        if (!client_name || draftLines.length === 0) return alert('Name and at least one line item required.');
+        const msg = document.getElementById('b-msg'); msg.style.color = '#111'; msg.innerText = 'Saving...';
+        
+        // Strict Payload Generation to prevent database crashes
+        const payload = { 
+            client_name: client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, 
+            client_address: document.getElementById('b-address').value, comments: document.getElementById('b-comments').value, 
+            po_job_name: document.getElementById('b-po').value, deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), 
+            itemized_lines: draftLines, total_amount: draftTotal 
+        };
+        
+        if (docType === 'Estimate') payload.project_type = document.getElementById('b-project').value;
         if (editingDocId) payload.id = editingDocId;
-        await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: editingDocId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
-        resetBuilder(); loadDashboardData();
+        
+        try {
+            const res = await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: editingDocId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+            if (res.ok) { resetBuilder(); loadDashboardData(); } 
+            else { const errData = await res.json(); alert(`Save Failed: ${errData.error || 'Database rejected save'}`); msg.style.color = 'red'; msg.innerText = 'Save Failed.'; }
+        } catch (e) { alert('Connection Error.'); msg.style.color = 'red'; msg.innerText = 'Connection Error.'; }
     }
 
     // --- ADD PRICE ITEM ---
     async function saveNewPrice() {
-        const item_name = document.getElementById('new-item-name').value;
-        const category = document.getElementById('new-item-cat').value;
-        const unit = document.getElementById('new-item-unit').value;
-        const unit_price = document.getElementById('new-item-price').value;
-
+        const item_name = document.getElementById('new-item-name').value; const category = document.getElementById('new-item-cat').value; const unit = document.getElementById('new-item-unit').value; const unit_price = document.getElementById('new-item-price').value;
         if (!item_name || !category || !unit || !unit_price) return alert('Please fill out all fields.');
         document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Saving...';
-
-        try {
-            const res = await fetch('/.netlify/functions/add-price', { method: 'POST', body: JSON.stringify({ item_name, category, unit, unit_price }) });
-            if (res.ok) {
-                document.getElementById('add-price-box').style.display = 'none';
-                ['new-item-name', 'new-item-cat', 'new-item-unit', 'new-item-price'].forEach(id => document.getElementById(id).value = '');
-                document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item';
-                loadDashboardData(); 
-            } else {
-                const err = await res.json(); alert(`Failed to save: ${err.error}`);
-                document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item';
-            }
-        } catch (e) { alert('Connection Error.'); document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item'; }
+        try { const res = await fetch('/.netlify/functions/add-price', { method: 'POST', body: JSON.stringify({ item_name, category, unit, unit_price }) }); if (res.ok) { document.getElementById('add-price-box').style.display = 'none'; ['new-item-name', 'new-item-cat', 'new-item-unit', 'new-item-price'].forEach(id => document.getElementById(id).value = ''); document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item'; loadDashboardData(); } else { const err = await res.json(); alert(`Failed to save: ${err.error}`); document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item'; } } catch (e) { alert('Connection Error.'); document.querySelector('#add-price-box .action-btn:last-child').innerText = 'Save Item'; }
     }
 
     // --- UTILS & PRINTING ---
@@ -513,13 +497,8 @@
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
     
     async function submitExpense(e) { 
-        e.preventDefault(); 
-        const btn = e.target.querySelector('button'); btn.innerText = 'Saving...';
-        try {
-            await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); 
-            ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); 
-            loadDashboardData(); btn.innerText = 'Save Expense'; alert('Expense logged successfully!');
-        } catch(err) { alert('Error saving expense.'); btn.innerText = 'Save Expense'; }
+        e.preventDefault(); const btn = e.target.querySelector('button'); btn.innerText = 'Saving...';
+        try { await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); loadDashboardData(); btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); } catch(err) { alert('Error saving expense.'); btn.innerText = 'Save Expense'; }
     }
     
     async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
@@ -563,13 +542,9 @@
             csvContent += `${safeName},${safeCat},${safeUnit},${item.unit_price}\n`;
         });
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", `Spotlight_Price_Sheet_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const url = URL.createObjectURL(blob); const link = document.createElement("a");
+        link.setAttribute("href", url); link.setAttribute("download", `Spotlight_Price_Sheet_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
     async function emailPnL() { if (confirm('Email this report to yourself?')) { await fetch('/.netlify/functions/email-report', { method: 'POST', body: JSON.stringify({ startDate: document.getElementById('pnl-start').value, endDate: document.getElementById('pnl-end').value, rev: document.getElementById('pnl-revenue').innerText, exp: document.getElementById('pnl-expenses').innerText, net: document.getElementById('pnl-net').innerText, breakdownHtml: document.getElementById('expense-breakdown').innerHTML }) }); alert('Report emailed successfully!'); } }
