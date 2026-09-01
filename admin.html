@@ -28,10 +28,12 @@
         .toolbar { display: flex; gap: 15px; align-items: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #e5e5e5; margin-bottom: 20px; flex-wrap: wrap; }
         .flag-box { background: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: none; font-weight: bold; }
         
+        /* Strict PDF Print Layout Rules */
         @media print {
+            @page { size: letter portrait; margin: 0.5in; }
             body * { display: none !important; }
             #print-section, #print-section * { display: block !important; }
-            #print-section { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: white; }
+            #print-section { position: absolute; left: 0; top: 0; width: 100%; padding: 0; margin: 0; background: white; }
         }
     </style>
 </head>
@@ -105,7 +107,7 @@
                 </div>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                     <input type="text" id="b-address" placeholder="Property Address" style="flex:2; padding:8px;">
-                    <input type="text" id="b-project" placeholder="Project Type (Estimates Only)" style="flex:1; padding:8px;">
+                    <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
                     <input type="text" id="b-po" placeholder="PO / Job Name" style="flex:1; padding:8px;">
                 </div>
                 <textarea id="b-comments" rows="2" placeholder="Notes / Comments for Client..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
@@ -348,14 +350,11 @@
 
     // --- PURCHASE ORDER BUILDER ---
     function openPOBuilder(invoiceId) {
-        editingPOId = null;
-        currentInvForPO = globalInvoices.find(i => i.id === invoiceId);
+        editingPOId = null; currentInvForPO = globalInvoices.find(i => i.id === invoiceId);
         document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
         document.getElementById('po-client').innerText = currentInvForPO.client_name; document.getElementById('po-address').innerText = currentInvForPO.client_address || 'N/A';
         ['po-ic-name', 'po-ic-email', 'po-ic-phone', 'po-labor-type', 'po-comments'].forEach(id => document.getElementById(id).value = '');
-        
-        poDraftLines = [];
-        currentInvForPO.itemized_lines.forEach((item) => { poDraftLines.push({ item_name: item.item_name, qty: item.qty, unit_price: 0, line_total: 0 }); });
+        poDraftLines = []; currentInvForPO.itemized_lines.forEach((item) => { poDraftLines.push({ item_name: item.item_name, qty: item.qty, unit_price: 0, line_total: 0 }); });
         renderPOLines(); window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
     }
 
@@ -379,13 +378,7 @@
         document.getElementById('po-total').innerText = poDraftTotal.toFixed(2);
     }
 
-    function updatePOLine(idx, field, val) {
-        if (field === 'name') poDraftLines[idx].item_name = val;
-        if (field === 'qty') poDraftLines[idx].qty = parseFloat(val) || 0;
-        if (field === 'price') poDraftLines[idx].unit_price = parseFloat(val) || 0;
-        renderPOLines();
-    }
-    
+    function updatePOLine(idx, field, val) { if (field === 'name') poDraftLines[idx].item_name = val; if (field === 'qty') poDraftLines[idx].qty = parseFloat(val) || 0; if (field === 'price') poDraftLines[idx].unit_price = parseFloat(val) || 0; renderPOLines(); }
     function removePOLine(idx) { poDraftLines.splice(idx, 1); renderPOLines(); }
 
     async function savePO() {
@@ -408,10 +401,7 @@
     function resetBuilder() {
         editingDocId = null; editingDocType = null; document.querySelector('input[value="Estimate"]').checked = true; toggleDeposit('Estimate');
         document.getElementById('builder-box').style.display = 'none'; draftLines = []; renderDraftLines();
-        ['b-name', 'b-email', 'b-phone', 'b-address', 'b-project', 'b-po', 'b-comments', 'b-custom-name', 'b-custom-price', 'b-custom-qty'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.value = '';
-        });
+        ['b-name', 'b-email', 'b-phone', 'b-address', 'b-project', 'b-po', 'b-comments', 'b-custom-name', 'b-custom-price', 'b-custom-qty'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
         document.getElementById('b-deposit').value = '0'; document.getElementById('b-msg').innerText = '';
     }
     
@@ -435,7 +425,6 @@
         document.getElementById('b-total').innerText = draftTotal.toFixed(2);
     }
 
-    // Standard Addition
     function addLineItem() {
         const selectId = document.getElementById('b-item-select').value; const qty = parseFloat(document.getElementById('b-qty').value);
         if (!selectId || !qty || qty <= 0 || isNaN(qty)) return alert("Select item and valid quantity.");
@@ -446,16 +435,11 @@
         renderDraftLines();
     }
     
-    // Custom Addition
     function addCustomLineItem() {
-        const name = document.getElementById('b-custom-name').value;
-        const price = parseFloat(document.getElementById('b-custom-price').value);
-        const qty = parseFloat(document.getElementById('b-custom-qty').value);
+        const name = document.getElementById('b-custom-name').value; const price = parseFloat(document.getElementById('b-custom-price').value); const qty = parseFloat(document.getElementById('b-custom-qty').value);
         if (!name || isNaN(price) || isNaN(qty) || qty <= 0) return alert("Please enter a custom name, price, and valid quantity.");
-        
         draftLines.push({ item_name: name, category: "Custom / Special", qty: qty, base_cost: price, unit_price: price, line_total: price * qty });
-        document.getElementById('b-custom-name').value = ''; document.getElementById('b-custom-price').value = ''; document.getElementById('b-custom-qty').value = '';
-        renderDraftLines();
+        document.getElementById('b-custom-name').value = ''; document.getElementById('b-custom-price').value = ''; document.getElementById('b-custom-qty').value = ''; renderDraftLines();
     }
     
     function removeLine(index) { draftLines.splice(index, 1); renderDraftLines(); }
@@ -465,21 +449,13 @@
         if (!client_name || draftLines.length === 0) return alert('Name and at least one line item required.');
         const msg = document.getElementById('b-msg'); msg.style.color = '#111'; msg.innerText = 'Saving...';
         
-        // Strict Payload Generation to prevent database crashes
-        const payload = { 
-            client_name: client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, 
-            client_address: document.getElementById('b-address').value, comments: document.getElementById('b-comments').value, 
-            po_job_name: document.getElementById('b-po').value, deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), 
-            itemized_lines: draftLines, total_amount: draftTotal 
-        };
-        
+        const payload = { client_name: client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, client_address: document.getElementById('b-address').value, comments: document.getElementById('b-comments').value, po_job_name: document.getElementById('b-po').value, deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), itemized_lines: draftLines, total_amount: draftTotal };
         if (docType === 'Estimate') payload.project_type = document.getElementById('b-project').value;
         if (editingDocId) payload.id = editingDocId;
         
         try {
             const res = await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: editingDocId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
-            if (res.ok) { resetBuilder(); loadDashboardData(); } 
-            else { const errData = await res.json(); alert(`Save Failed: ${errData.error || 'Database rejected save'}`); msg.style.color = 'red'; msg.innerText = 'Save Failed.'; }
+            if (res.ok) { resetBuilder(); loadDashboardData(); } else { const errData = await res.json(); alert(`Save Failed: ${errData.error || 'Database rejected save'}`); msg.style.color = 'red'; msg.innerText = 'Save Failed.'; }
         } catch (e) { alert('Connection Error.'); msg.style.color = 'red'; msg.innerText = 'Connection Error.'; }
     }
 
@@ -495,21 +471,18 @@
     async function deleteDoc(id, docType) { if (confirm(`Delete ${docType}?`)) { await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
     async function editPrice(id, name, currentPrice) { const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); if (newPrice) { await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); loadDashboardData(); } }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
-    
-    async function submitExpense(e) { 
-        e.preventDefault(); const btn = e.target.querySelector('button'); btn.innerText = 'Saving...';
-        try { await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); loadDashboardData(); btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); } catch(err) { alert('Error saving expense.'); btn.innerText = 'Save Expense'; }
-    }
-    
+    async function submitExpense(e) { e.preventDefault(); const btn = e.target.querySelector('button'); btn.innerText = 'Saving...'; try { await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); loadDashboardData(); btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); } catch(err) { alert('Error saving expense.'); btn.innerText = 'Save Expense'; } }
     async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
     async function sendEstimate(id) { if (confirm('Email Estimate?')) { alert('Sending...'); await fetch('/.netlify/functions/send-estimate', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
 
     function printDoc(id, docType) {
         const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
         const itemsHtml = doc.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
+        const depositAmt = parseFloat(doc.deposit_paid || 0);
+        const balHtml = docType === 'Invoice' ? `<h4 style="color:#c62828; margin:5px 0;">Less Deposit Paid: -$${depositAmt.toFixed(2)}</h4><h2 style="color:#111;">Balance Due: $${(doc.total_amount - depositAmt).toFixed(2)}</h2>` : '';
         const cmtHtml = doc.comments ? `<div style="margin-top:20px; padding:15px; background:#f9f9f9; border-left:4px solid #111;"><strong>Notes:</strong><br>${doc.comments}</div>` : '';
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 100px;"></div><div style="display: flex; justify-content: space-between; margin-bottom: 40px; border-top: 2px solid #111; padding-top: 20px;"><div><strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br><strong>Bill To:</strong> ${doc.client_name}<br>${doc.client_address || ''}</div><div style="text-align: right;"><strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br><strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3 style="margin-bottom: 5px;">Total: $${doc.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
-        window.print();
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 100px;"></div><div style="display: flex; justify-content: space-between; margin-bottom: 40px; border-top: 2px solid #111; padding-top: 20px;"><div><strong style="font-size: 1.2rem;">${docType.toUpperCase()} #${doc.id}</strong><br><br><strong>Bill To:</strong> ${doc.client_name}<br>${doc.client_address || ''}</div><div style="text-align: right;"><strong>Project / PO:</strong> ${doc.po_job_name || doc.project_type || 'N/A'}<br><strong>Date:</strong> ${new Date(doc.created_at || doc.issue_date).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3 style="margin-bottom: 5px;">Total: $${doc.total_amount.toFixed(2)}</h3>${balHtml}</div>${cmtHtml}</div>`;
+        setTimeout(() => window.print(), 500);
     }
 
     function printPO(id) {
@@ -518,18 +491,18 @@
         const contactHtml = `${po.ic_email ? `Email: ${po.ic_email}<br>` : ''}${po.ic_phone ? `Phone: ${po.ic_phone}<br>` : ''}`;
         const cmtHtml = po.comments ? `<div style="margin-top:20px; padding:15px; background:#e3f2fd; border-left:4px solid #1565c0;"><strong>Instructions:</strong><br>${po.comments}</div>` : '';
         document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Scope</th><th style="padding: 10px;">Qty</th><th style="padding: 10px;">Piece Rate</th><th style="padding: 10px;">Total</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
-        window.print();
+        setTimeout(() => window.print(), 500);
     }
 
     function printPnL() {
         document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Profit & Loss Report</h1><p><strong>Dates:</strong> ${document.getElementById('pnl-start').value || 'All Time'} to ${document.getElementById('pnl-end').value || 'Present'}</p><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><tr style="background: #f4f6f9;"><th style="padding: 10px;">Category</th><th style="padding: 10px; text-align:right;">Amount</th></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Revenue</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-revenue').innerText}</strong></td></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Expenses</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-expenses').innerText}</strong></td></tr><tr style="background: #e8f5e9;"><td style="padding: 10px;"><strong>Net Operating Profit</strong></td><td style="padding: 10px; text-align:right; color: #2e7d32;"><strong>${document.getElementById('pnl-net').innerText}</strong></td></tr></table><h3 style="margin-top: 30px;">Expense Breakdown</h3><div style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">${document.getElementById('expense-breakdown').innerHTML}</div></div>`;
-        window.print();
+        setTimeout(() => window.print(), 500);
     }
     
     function printPriceSheet() {
         const itemsHtml = globalPrices.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.category}</td><td style="padding:10px; border-bottom:1px solid #ddd;">${item.unit}</td><td style="padding:10px; border-bottom:1px solid #ddd;">$${item.unit_price.toFixed(2)}</td></tr>`).join('');
         document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2><table style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: left;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px;">Item Name</th><th style="padding: 10px;">Category</th><th style="padding: 10px;">Cost Unit</th><th style="padding: 10px;">Base Cost ($)</th></tr></thead><tbody>${itemsHtml}</tbody></table></div>`;
-        window.print();
+        setTimeout(() => window.print(), 500);
     }
 
     function exportPriceSheetCSV() {
