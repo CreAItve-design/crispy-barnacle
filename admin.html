@@ -28,6 +28,7 @@
         .toolbar { display: flex; gap: 15px; align-items: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #e5e5e5; margin-bottom: 20px; flex-wrap: wrap; }
         .flag-box { background: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: none; font-weight: bold; }
         
+        /* Strict PDF Print Layout Rules */
         @media print {
             @page { size: letter portrait; margin: 0.5in; }
             body.admin-body { background: white !important; padding: 0 !important; margin: 0 !important; }
@@ -107,7 +108,7 @@
         <div id="tab-estimates" class="tab-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                 <h2>Active Documents</h2>
-                <button class="action-btn" onclick="document.getElementById('builder-box').style.display='block'; document.getElementById('po-builder-box').style.display='none';">+ Create Client Document</button>
+                <button class="action-btn" onclick="openBuilder()">+ Create Client Document</button>
             </div>
 
             <!-- CLIENT BUILDER -->
@@ -171,7 +172,14 @@
                 </div>
                 <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
                 <table style="margin-bottom: 15px; width: 100%;">
-                    <thead><tr><th style="width: 50%;">Item / Scope</th><th style="width: 15%;">Qty</th><th style="width: 15%;">Set Piece Rate ($)</th><th style="width: 20%;">Total Payout</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th style="width: 50%;">Item / Scope</th>
+                            <th style="width: 15%;">Qty</th>
+                            <th style="width: 15%;">Set Piece Rate ($)</th>
+                            <th style="width: 20%;">Total Payout</th>
+                        </tr>
+                    </thead>
                     <tbody id="po-lines"></tbody>
                 </table>
                 <h2 style="text-align: right; margin-bottom: 20px;">PO Total: $<span id="po-total">0.00</span></h2>
@@ -223,6 +231,7 @@
                     <select id="exp-category" required>
                         <option value="Payroll (Owner / W2)">Payroll (Owner / W2)</option>
                         <option value="1099 Contractor / IC">1099 Contractor / IC</option>
+                        <option value="Job Supplies / Materials">Job Supplies / Materials</option>
                         <option value="Office Supplies">Office Supplies</option>
                         <option value="Technology & Software">Technology & Software</option>
                         <option value="Credit Card / Debt Service">Credit Card / Debt Service</option>
@@ -454,7 +463,6 @@
         link.click();
     }
 
-    // A robust CSV parser to handle quotes and commas inside columns
     function parseCSVRow(str) {
         let arr = [], quote = false, row = '';
         for (let c = 0; c < str.length; c++) {
@@ -513,6 +521,24 @@
     }
 
     // --- CLIENT BUILDER ---
+    function openBuilder() {
+        resetBuilder();
+        
+        // Auto-Inject Trash Removal
+        draftLines.push({
+            item_name: "Trash Removal (Bagster System) - Optional",
+            category: "Material", 
+            qty: 1,
+            base_cost: 225.00,
+            unit_price: 270.00, // 20% Markup
+            line_total: 270.00
+        });
+        renderDraftLines();
+        
+        document.getElementById('builder-box').style.display = 'block';
+        document.getElementById('po-builder-box').style.display = 'none';
+    }
+
     function resetBuilder() {
         editingDocId = null; editingDocType = null; document.querySelector('input[value="Estimate"]').checked = true; toggleDeposit('Estimate');
         document.getElementById('builder-box').style.display = 'none'; draftLines = []; renderDraftLines();
