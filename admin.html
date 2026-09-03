@@ -172,7 +172,14 @@
                 </div>
                 <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
                 <table style="margin-bottom: 15px; width: 100%;">
-                    <thead><tr><th style="width: 50%;">Item / Scope</th><th style="width: 15%;">Qty</th><th style="width: 15%;">Set Piece Rate ($)</th><th style="width: 20%;">Total Payout</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th style="width: 50%;">Item / Scope</th>
+                            <th style="width: 15%;">Qty</th>
+                            <th style="width: 15%;">Set Piece Rate ($)</th>
+                            <th style="width: 20%;">Total Payout</th>
+                        </tr>
+                    </thead>
                     <tbody id="po-lines"></tbody>
                 </table>
                 <h2 style="text-align: right; margin-bottom: 20px;">PO Total: $<span id="po-total">0.00</span></h2>
@@ -233,6 +240,7 @@
                         <option value="Company Meals (50% Deductible)">Company Meals (50% Deductible)</option>
                         <option value="Vehicle / Fuel">Vehicle & Gas</option>
                         <option value="Tools & Equipment">Tools & Equipment</option>
+                        <option value="Taxes / Accounting Fees">Taxes / Accounting Fees</option>
                         <option value="Miscellaneous">Miscellaneous</option>
                     </select>
                 </div>
