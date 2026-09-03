@@ -172,14 +172,7 @@
                 </div>
                 <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
                 <table style="margin-bottom: 15px; width: 100%;">
-                    <thead>
-                        <tr>
-                            <th style="width: 50%;">Item / Scope</th>
-                            <th style="width: 15%;">Qty</th>
-                            <th style="width: 15%;">Set Piece Rate ($)</th>
-                            <th style="width: 20%;">Total Payout</th>
-                        </tr>
-                    </thead>
+                    <thead><tr><th style="width: 50%;">Item / Scope</th><th style="width: 15%;">Qty</th><th style="width: 15%;">Set Piece Rate ($)</th><th style="width: 20%;">Total Payout</th></tr></thead>
                     <tbody id="po-lines"></tbody>
                 </table>
                 <h2 style="text-align: right; margin-bottom: 20px;">PO Total: $<span id="po-total">0.00</span></h2>
@@ -311,11 +304,13 @@
                 globalInvoices = await invRes.json();
                 const invBody = document.getElementById('invoices-table-body'); invBody.innerHTML = '';
                 globalInvoices.forEach(inv => {
-                    const balance = inv.total_amount - (inv.deposit_paid || 0);
+                    const balance = inv.status === 'Paid' ? 0 : (inv.total_amount - (inv.deposit_paid || 0));
                     const actionBtn = inv.status === 'Unpaid' ? `<button onclick="markInvoicePaid(${inv.id})" class="action-btn" style="background:#2e7d32; margin-bottom:5px;">Mark Paid</button>` : `<em style="color:#2e7d32; font-weight:bold;">Paid</em>`;
+                    const balColor = inv.status === 'Paid' ? '#2e7d32' : '#111';
+                    
                     invBody.innerHTML += `<tr>
                         <td><strong>#${inv.id}</strong></td><td><strong>${inv.client_name}</strong><br><small>${inv.po_job_name || ''}</small></td>
-                        <td>${inv.client_address || 'N/A'}</td><td>$${inv.total_amount} <br><small>Bal: $${balance.toFixed(2)}</small></td><td>${inv.status}</td>
+                        <td>${inv.client_address || 'N/A'}</td><td>$${inv.total_amount.toFixed(2)} <br><small style="color:${balColor}; font-weight:bold;">Bal: $${balance.toFixed(2)}</small></td><td>${inv.status}</td>
                         <td>${actionBtn}<div style="display:flex; gap:4px; margin-top:5px; flex-wrap:wrap;">
                             <button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444;">PDF</button> 
                             <button onclick="editDocument(${inv.id}, 'Invoice')" class="action-btn" style="background:#f39c12;">Edit</button> 
@@ -333,7 +328,7 @@
                 globalEstimates.forEach(est => {
                     estBody.innerHTML += `<tr>
                         <td><strong>#${est.id}</strong></td><td><strong>${est.client_name}</strong><br><small>${est.po_job_name || ''}</small></td>
-                        <td>${est.project_type || ''}</td><td>$${est.total_amount}</td>
+                        <td>${est.project_type || ''}</td><td>$${est.total_amount.toFixed(2)}</td>
                         <td><div style="display:flex; gap:4px; flex-wrap:wrap;">
                             <button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">PDF</button> 
                             <button onclick="editDocument(${est.id}, 'Estimate')" class="action-btn" style="background:#f39c12;">Edit</button> 
@@ -352,7 +347,7 @@
                         <td><strong>PO-${po.id}</strong><br><small>Inv #${po.invoice_id}</small></td>
                         <td><strong>${po.ic_name}</strong><br><small>${po.labor_type || ''}</small></td>
                         <td>${po.client_name}<br><small>${po.client_address || ''}</small></td>
-                        <td><strong>$${po.total_amount}</strong></td>
+                        <td><strong>$${po.total_amount.toFixed(2)}</strong></td>
                         <td><span style="background:#eee; padding:3px 6px; border-radius:4px; font-size:0.8rem;">${po.status || 'Issued'}</span></td>
                         <td><div style="display:flex; gap:4px; flex-wrap:wrap;">
                             <button onclick="printPO(${po.id})" class="action-btn" style="background:#444;">PDF</button> 
@@ -365,92 +360,6 @@
             }
         } catch(e) {}
     }
-
-    // --- PURCHASE ORDER BUILDER ---
-    function openPOBuilder(invoiceId) {
-        editingPOId = null;
-        currentInvForPO = globalInvoices.find(i => i.id === invoiceId);
-        document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
-        document.getElementById('po-client').innerText = currentInvForPO.client_name; document.getElementById('po-address').innerText = currentInvForPO.client_address || 'N/A';
-        ['po-ic-name', 'po-ic-email', 'po-ic-phone', 'po-labor-type', 'po-comments'].forEach(id => document.getElementById(id).value = '');
-        
-        poDraftLines = [];
-        currentInvForPO.itemized_lines.forEach((item) => {
-            poDraftLines.push({ item_name: item.item_name, qty: item.qty, unit_price: 0, line_total: 0 });
-        });
-        renderPOLines();
-        window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
-    }
-
-    function editPO(poId) {
-        const po = globalPOs.find(p => p.id === poId);
-        if (!po) return;
-        editingPOId = po.id;
-        currentInvForPO = { id: po.invoice_id }; 
-        document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
-        document.getElementById('po-client').innerText = po.client_name; document.getElementById('po-address').innerText = po.client_address || 'N/A';
-        document.getElementById('po-ic-name').value = po.ic_name || ''; document.getElementById('po-ic-email').value = po.ic_email || ''; document.getElementById('po-ic-phone').value = po.ic_phone || '';
-        document.getElementById('po-labor-type').value = po.labor_type || ''; document.getElementById('po-comments').value = po.comments || '';
-        
-        poDraftLines = [...po.itemized_lines];
-        renderPOLines();
-        window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
-    }
-
-    function renderPOLines() {
-        const tbody = document.getElementById('po-lines');
-        tbody.innerHTML = ''; poDraftTotal = 0;
-        poDraftLines.forEach((item, idx) => {
-            const price = item.unit_price || 0;
-            const qty = item.qty || 0;
-            const lineTotal = price * qty;
-            poDraftTotal += lineTotal;
-            poDraftLines[idx].line_total = lineTotal; 
-            
-            tbody.innerHTML += `<tr>
-                <td><input type="text" value="${item.item_name.replace(/"/g, '&quot;')}" onchange="updatePOLine(${idx}, 'name', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                <td><input type="number" step="0.1" value="${qty}" onchange="updatePOLine(${idx}, 'qty', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                <td>$<input type="number" step="0.01" value="${price}" onchange="updatePOLine(${idx}, 'price', this.value)" style="width:80%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td>
-                <td style="font-weight:bold;">$${lineTotal.toFixed(2)} <button onclick="removePOLine(${idx})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td>
-            </tr>`;
-        });
-        document.getElementById('po-total').innerText = poDraftTotal.toFixed(2);
-    }
-
-    function updatePOLine(idx, field, val) {
-        if (field === 'name') poDraftLines[idx].item_name = val;
-        if (field === 'qty') poDraftLines[idx].qty = parseFloat(val) || 0;
-        if (field === 'price') poDraftLines[idx].unit_price = parseFloat(val) || 0;
-        renderPOLines();
-    }
-    
-    function removePOLine(idx) { poDraftLines.splice(idx, 1); renderPOLines(); }
-
-    async function savePO() {
-        const ic_name = document.getElementById('po-ic-name').value;
-        if (!ic_name || poDraftLines.length === 0) return alert('Contractor name and at least one line item required.');
-        const payload = {
-            invoice_id: currentInvForPO ? currentInvForPO.id : null, ic_name, 
-            ic_email: document.getElementById('po-ic-email').value, ic_phone: document.getElementById('po-ic-phone').value,
-            client_name: document.getElementById('po-client').innerText, client_address: document.getElementById('po-address').innerText,
-            labor_type: document.getElementById('po-labor-type').value, comments: document.getElementById('po-comments').value,
-            itemized_lines: poDraftLines, total_amount: poDraftTotal, status: 'Issued'
-        };
-        if (editingPOId) payload.id = editingPOId;
-        await fetch('/.netlify/functions/manage-pos', { method: editingPOId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
-        document.getElementById('po-builder-box').style.display = 'none'; loadDashboardData();
-    }
-
-    async function sendPO(id) {
-        if (!confirm(`Email PO #${id} to the contractor? (You will be automatically CC'd)`)) return;
-        alert('Sending PO... Please wait.');
-        try {
-            const res = await fetch('/.netlify/functions/send-po', { method: 'POST', body: JSON.stringify({ id }) });
-            if (res.ok) { alert('PO Sent!'); loadDashboardData(); } else { const data = await res.json(); alert(`Failed to send: ${data.error}`); }
-        } catch(e) { alert('Connection Error.'); }
-    }
-
-    async function deletePO(id) { if(confirm('Delete PO?')) { await fetch('/.netlify/functions/manage-pos', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
 
     // --- HISTORICAL BULK IMPORTER ---
     function downloadImportTemplate() {
@@ -520,23 +429,61 @@
         reader.readAsText(file);
     }
 
+    // --- PURCHASE ORDER BUILDER ---
+    function openPOBuilder(invoiceId) {
+        editingPOId = null; currentInvForPO = globalInvoices.find(i => i.id === invoiceId);
+        document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
+        document.getElementById('po-client').innerText = currentInvForPO.client_name; document.getElementById('po-address').innerText = currentInvForPO.client_address || 'N/A';
+        ['po-ic-name', 'po-ic-email', 'po-ic-phone', 'po-labor-type', 'po-comments'].forEach(id => document.getElementById(id).value = '');
+        poDraftLines = []; currentInvForPO.itemized_lines.forEach((item) => { poDraftLines.push({ item_name: item.item_name, qty: item.qty, unit_price: 0, line_total: 0 }); });
+        renderPOLines(); window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
+    }
+
+    function editPO(poId) {
+        const po = globalPOs.find(p => p.id === poId); if (!po) return;
+        editingPOId = po.id; currentInvForPO = { id: po.invoice_id }; 
+        document.getElementById('po-builder-box').style.display = 'block'; document.getElementById('builder-box').style.display = 'none';
+        document.getElementById('po-client').innerText = po.client_name; document.getElementById('po-address').innerText = po.client_address || 'N/A';
+        document.getElementById('po-ic-name').value = po.ic_name || ''; document.getElementById('po-ic-email').value = po.ic_email || ''; document.getElementById('po-ic-phone').value = po.ic_phone || '';
+        document.getElementById('po-labor-type').value = po.labor_type || ''; document.getElementById('po-comments').value = po.comments || '';
+        poDraftLines = [...po.itemized_lines]; renderPOLines(); window.scrollTo({ top: document.getElementById('po-builder-box').offsetTop - 20, behavior: 'smooth' });
+    }
+
+    function renderPOLines() {
+        const tbody = document.getElementById('po-lines'); tbody.innerHTML = ''; poDraftTotal = 0;
+        poDraftLines.forEach((item, idx) => {
+            const price = item.unit_price || 0; const qty = item.qty || 0; const lineTotal = price * qty;
+            poDraftTotal += lineTotal; poDraftLines[idx].line_total = lineTotal; 
+            tbody.innerHTML += `<tr><td><input type="text" value="${item.item_name.replace(/"/g, '&quot;')}" onchange="updatePOLine(${idx}, 'name', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td><td><input type="number" step="0.1" value="${qty}" onchange="updatePOLine(${idx}, 'qty', this.value)" style="width:100%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td><td>$<input type="number" step="0.01" value="${price}" onchange="updatePOLine(${idx}, 'price', this.value)" style="width:80%; padding:6px; border:1px solid #ccc; border-radius:4px;"></td><td style="font-weight:bold;">$${lineTotal.toFixed(2)} <button onclick="removePOLine(${idx})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer; margin-left:10px; font-size:1.2rem;">✖</button></td></tr>`;
+        });
+        document.getElementById('po-total').innerText = poDraftTotal.toFixed(2);
+    }
+
+    function updatePOLine(idx, field, val) { if (field === 'name') poDraftLines[idx].item_name = val; if (field === 'qty') poDraftLines[idx].qty = parseFloat(val) || 0; if (field === 'price') poDraftLines[idx].unit_price = parseFloat(val) || 0; renderPOLines(); }
+    function removePOLine(idx) { poDraftLines.splice(idx, 1); renderPOLines(); }
+
+    async function savePO() {
+        const ic_name = document.getElementById('po-ic-name').value;
+        if (!ic_name || poDraftLines.length === 0) return alert('Contractor name and at least one line item required.');
+        const payload = { invoice_id: currentInvForPO ? currentInvForPO.id : null, ic_name, ic_email: document.getElementById('po-ic-email').value, ic_phone: document.getElementById('po-ic-phone').value, client_name: document.getElementById('po-client').innerText, client_address: document.getElementById('po-address').innerText, labor_type: document.getElementById('po-labor-type').value, comments: document.getElementById('po-comments').value, itemized_lines: poDraftLines, total_amount: poDraftTotal, status: 'Issued' };
+        if (editingPOId) payload.id = editingPOId;
+        await fetch('/.netlify/functions/manage-pos', { method: editingPOId ? 'PUT' : 'POST', body: JSON.stringify(payload) });
+        document.getElementById('po-builder-box').style.display = 'none'; loadDashboardData();
+    }
+
+    async function sendPO(id) {
+        if (!confirm(`Email PO #${id} to the contractor? (You will be automatically CC'd)`)) return;
+        alert('Sending PO... Please wait.');
+        try { const res = await fetch('/.netlify/functions/send-po', { method: 'POST', body: JSON.stringify({ id }) }); if (res.ok) { alert('PO Sent!'); loadDashboardData(); } else { const data = await res.json(); alert(`Failed to send: ${data.error}`); } } catch(e) { alert('Connection Error.'); }
+    }
+    async function deletePO(id) { if(confirm('Delete PO?')) { await fetch('/.netlify/functions/manage-pos', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
+
     // --- CLIENT BUILDER ---
     function openBuilder() {
         resetBuilder();
-        
-        // Auto-Inject Trash Removal
-        draftLines.push({
-            item_name: "Trash Removal (Bagster System) - Optional",
-            category: "Material", 
-            qty: 1,
-            base_cost: 225.00,
-            unit_price: 270.00, // 20% Markup
-            line_total: 270.00
-        });
+        draftLines.push({ item_name: "Trash Removal (Bagster System) - Optional", category: "Material", qty: 1, base_cost: 225.00, unit_price: 270.00, line_total: 270.00 });
         renderDraftLines();
-        
-        document.getElementById('builder-box').style.display = 'block';
-        document.getElementById('po-builder-box').style.display = 'none';
+        document.getElementById('builder-box').style.display = 'block'; document.getElementById('po-builder-box').style.display = 'none';
     }
 
     function resetBuilder() {
@@ -625,8 +572,20 @@
             <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.line_total.toFixed(2)}</td>
         </tr>`).join('');
         
-        const depositAmt = parseFloat(doc.deposit_paid || 0);
-        const balHtml = docType === 'Invoice' && depositAmt > 0 ? `<h4 style="color:#c62828; margin:5px 0;">Less Deposit Paid: -$${depositAmt.toFixed(2)}</h4><h2 style="color:#111;">Balance Due: $${(doc.total_amount - depositAmt).toFixed(2)}</h2>` : '';
+        let balHtml = '';
+        if (docType === 'Invoice') {
+            if (doc.status === 'Paid') {
+                balHtml = `<h2 style="color:#2e7d32; margin:10px 0;">PAID IN FULL</h2><h3 style="color:#111; margin:0;">Balance Due: $0.00</h3>`;
+            } else {
+                const depositAmt = parseFloat(doc.deposit_paid || 0);
+                if (depositAmt > 0) {
+                    balHtml = `<h4 style="color:#c62828; margin:5px 0;">Less Deposit Paid: -$${depositAmt.toFixed(2)}</h4><h2 style="color:#111; margin:0;">Balance Due: $${(doc.total_amount - depositAmt).toFixed(2)}</h2>`;
+                } else {
+                    balHtml = `<h2 style="color:#111; margin-top:10px; margin-bottom:0;">Balance Due: $${doc.total_amount.toFixed(2)}</h2>`;
+                }
+            }
+        }
+        
         const cmtHtml = doc.comments ? `<div style="margin-top:20px; padding:15px; background:#f9f9f9; border-left:4px solid #111;"><strong>Notes:</strong><br>${doc.comments}</div>` : '';
         
         document.getElementById('print-section').innerHTML = `
@@ -654,66 +613,16 @@
 
     function printPO(id) {
         const po = globalPOs.find(p => p.id === id);
-        
-        const itemsHtml = po.itemized_lines.map(item => `<tr>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.qty}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.line_total.toFixed(2)}</td>
-        </tr>`).join('');
-        
+        const itemsHtml = po.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
         const contactHtml = `${po.ic_email ? `Email: ${po.ic_email}<br>` : ''}${po.ic_phone ? `Phone: ${po.ic_phone}<br>` : ''}`;
         const cmtHtml = po.comments ? `<div style="margin-top:20px; padding:15px; background:#e3f2fd; border-left:4px solid #1565c0;"><strong>Instructions:</strong><br>${po.comments}</div>` : '';
-        
-        document.getElementById('print-section').innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
-                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
-                <h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;">
-                    <div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div>
-                    <div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div>
-                </div>
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
-                    <thead>
-                        <tr style="background: #f4f6f9;">
-                            <th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #1565c0;">Scope of Work</th>
-                            <th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #1565c0;">Qty</th>
-                            <th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Piece Rate</th>
-                            <th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Total Payout</th>
-                        </tr>
-                    </thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-                <div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>
-                ${cmtHtml}
-            </div>`;
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #1565c0;">Scope of Work</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #1565c0;">Qty</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Piece Rate</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Total Payout</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
         setTimeout(() => window.print(), 500);
     }
 
     function printPriceSheet() {
-        const itemsHtml = globalPrices.map(item => `<tr>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.category}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.unit}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td>
-        </tr>`).join('');
-        
-        document.getElementById('print-section').innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
-                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
-                <h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                    <thead>
-                        <tr style="background: #f4f6f9;">
-                            <th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #111;">Item Name</th>
-                            <th style="padding: 10px; text-align: left; width: 25%; border-bottom: 2px solid #111;">Category</th>
-                            <th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #111;">Cost Unit</th>
-                            <th style="padding: 10px; text-align: right; width: 15%; border-bottom: 2px solid #111;">Base Cost</th>
-                        </tr>
-                    </thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-            </div>`;
+        const itemsHtml = globalPrices.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.category}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.unit}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td></tr>`).join('');
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2><table style="width: 100%; border-collapse: collapse; margin-top: 20px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #111;">Item Name</th><th style="padding: 10px; text-align: left; width: 25%; border-bottom: 2px solid #111;">Category</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #111;">Cost Unit</th><th style="padding: 10px; text-align: right; width: 15%; border-bottom: 2px solid #111;">Base Cost</th></tr></thead><tbody>${itemsHtml}</tbody></table></div>`;
         setTimeout(() => window.print(), 500);
     }
 
