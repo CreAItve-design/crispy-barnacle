@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 exports.handler = async (event) => {
     try {
         const { startDate, endDate } = event.queryStringParameters || {};
@@ -7,10 +8,16 @@ exports.handler = async (event) => {
         let expQ = supabase.from('expenses').select('*');
         let poQ = supabase.from('purchase_orders').select('*');
 
-        if (startDate) { invQ = invQ.gte('created_at', startDate); expQ = expQ.gte('created_at', startDate); poQ = poQ.gte('created_at', startDate); }
+        if (startDate) { 
+            invQ = invQ.gte('issue_date', startDate); 
+            expQ = expQ.gte('created_at', startDate); 
+            poQ = poQ.gte('created_at', startDate); 
+        }
         if (endDate) { 
             const end = new Date(endDate); end.setDate(end.getDate() + 1); 
-            invQ = invQ.lt('created_at', end.toISOString()); expQ = expQ.lt('created_at', end.toISOString()); poQ = poQ.lt('created_at', end.toISOString());
+            invQ = invQ.lt('issue_date', end.toISOString()); 
+            expQ = expQ.lt('created_at', end.toISOString()); 
+            poQ = poQ.lt('created_at', end.toISOString());
         }
 
         const [invData, expData, poData] = await Promise.all([invQ, expQ, poQ]);

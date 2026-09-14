@@ -28,7 +28,6 @@
         .toolbar { display: flex; gap: 15px; align-items: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #e5e5e5; margin-bottom: 20px; flex-wrap: wrap; }
         .flag-box { background: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: none; font-weight: bold; }
         
-        /* Strict PDF Print Layout Rules */
         @media print {
             @page { size: letter portrait; margin: 0.5in; }
             body.admin-body { background: white !important; padding: 0 !important; margin: 0 !important; }
@@ -82,7 +81,7 @@
             <!-- HISTORICAL DATA IMPORT BUILDER -->
             <div id="import-box" class="builder-box" style="display: none; background: #fff3e0; border-color: #ffb74d;">
                 <h3 style="color: #e65100; margin-bottom: 10px;">Import Historical Data (CSV)</h3>
-                <p style="font-size: 0.9rem; margin-bottom: 15px; color:#555;">Upload old invoices or expenses so they map to your historical P&L.</p>
+                <p style="font-size: 0.9rem; margin-bottom: 15px; color:#555;">Upload old line-item invoices or expenses to reconstruct historical P&L.</p>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
                     <select id="import-type" style="padding: 8px; flex: 1; border: 1px solid #ccc; border-radius: 4px;">
                         <option value="invoices">Import Invoices</option>
@@ -272,9 +271,17 @@
             globalPrices = await priceRes.json();
             priceBody.innerHTML = ''; document.getElementById('b-item-select').innerHTML = '<option value="">-- Select Material / Labor --</option>';
             globalPrices.forEach(item => {
+                const isArchived = item.item_name.includes('(Archived)');
                 const safeName = item.item_name.replace(/'/g, "\\'"); 
-                priceBody.innerHTML += `<tr><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price} <button onclick="editPrice(${item.id}, '${safeName}', ${item.unit_price})" style="float:right; background:#444; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Update Rate</button></td></tr>`;
-                document.getElementById('b-item-select').innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
+                const editBtn = isArchived ? '' : `<button onclick="editPrice(${item.id}, '${safeName}', ${item.unit_price})" style="float:right; background:#444; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Update Rate</button>`;
+                const rowStyle = isArchived ? 'color: #888; background: #f9f9f9;' : '';
+                
+                priceBody.innerHTML += `<tr style="${rowStyle}"><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price} ${editBtn}</td></tr>`;
+                
+                // Exclude archived items from active document builder
+                if (!isArchived) {
+                    document.getElementById('b-item-select').innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
+                }
             });
         } catch(e) {}
 
@@ -373,7 +380,7 @@
     function downloadImportTemplate() {
         const type = document.getElementById('import-type').value;
         const csv = type === 'invoices' 
-            ? "Date (YYYY-MM-DD),Client Name,Address,Total Amount,Deposit Paid,Status (Paid/Unpaid),Notes\n2025-06-15,John Doe,123 Main St,5000,5000,Paid,Historical Import" 
+            ? "Date (YYYY-MM-DD),Client Name,Address,Item Name,Category (e.g. Material/Labor),Qty,Base Cost,Client Unit Price,Deposit Paid,Status (Paid/Unpaid),Notes\n2025-06-15,John Doe,123 Main St,Premium Ceramic Tile,Material,100,2.00,2.50,0,Paid,Historical Import" 
             : "Date (YYYY-MM-DD),Category,Vendor,Amount,Description\n2025-06-15,Tools & Equipment,Home Depot,250.50,Saw blades";
         const blob = new Blob([csv], { type: 'text/csv' });
         const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = `Spotlight_Import_Template_${type}.csv`;
@@ -401,27 +408,55 @@
         const reader = new FileReader();
         reader.onload = async function(e) {
             const rows = e.target.result.split('\n');
-            const records = [];
+            let records = [];
+            let uniquePrices = {};
 
-            for (let i = 1; i < rows.length; i++) {
-                if (rows[i].trim() === '') continue;
-                const cols = parseCSVRow(rows[i]);
+            if (type === 'invoices') {
+                let invoiceMap = {};
+                for (let i = 1; i < rows.length; i++) {
+                    if (rows[i].trim() === '') continue;
+                    const cols = parseCSVRow(rows[i]);
+                    if (cols.length < 8) continue;
 
-                if (type === 'invoices') {
-                    if (cols.length < 4) continue;
-                    records.push({
-                        created_at: new Date(cols[0]).toISOString(),
-                        client_name: cols[1], client_address: cols[2] || '',
-                        total_amount: parseFloat(cols[3]) || 0, deposit_paid: parseFloat(cols[4]) || 0,
-                        status: cols[5] || 'Paid', comments: cols[6] || 'Historical Import',
-                        itemized_lines: [{ item_name: "Historical Import Record", qty: 1, unit_price: parseFloat(cols[3]) || 0, line_total: parseFloat(cols[3]) || 0, base_cost: 0 }]
+                    let dateKey = cols[0] + '_' + cols[1];
+                    let lineTotal = (parseFloat(cols[5]) || 0) * (parseFloat(cols[7]) || 0);
+
+                    if (!invoiceMap[dateKey]) {
+                        invoiceMap[dateKey] = {
+                            issue_date: new Date(cols[0]).toISOString(),
+                            client_name: cols[1], client_address: cols[2] || '',
+                            total_amount: 0, deposit_paid: parseFloat(cols[8]) || 0,
+                            status: cols[9] || 'Paid', comments: cols[10] || 'Historical Import',
+                            itemized_lines: []
+                        };
+                    }
+
+                    invoiceMap[dateKey].itemized_lines.push({
+                        item_name: cols[3], category: cols[4] || 'Material',
+                        qty: parseFloat(cols[5]) || 0, base_cost: parseFloat(cols[6]) || 0,
+                        unit_price: parseFloat(cols[7]) || 0, line_total: lineTotal
                     });
-                } else {
+                    invoiceMap[dateKey].total_amount += lineTotal;
+
+                    // Tag old imported prices as archived
+                    let pKey = cols[3] + " (Archived)";
+                    if (!uniquePrices[pKey]) {
+                        uniquePrices[pKey] = {
+                            item_name: pKey, category: cols[4] || 'Historical',
+                            unit: 'Custom', unit_price: parseFloat(cols[6]) || parseFloat(cols[7]) || 0
+                        };
+                    }
+                }
+                records = Object.values(invoiceMap);
+            } else {
+                for (let i = 1; i < rows.length; i++) {
+                    if (rows[i].trim() === '') continue;
+                    const cols = parseCSVRow(rows[i]);
                     if (cols.length < 4) continue;
                     records.push({
-                        created_at: new Date(cols[0]).toISOString(),
-                        category: cols[1], vendor_name: cols[2] || '',
-                        amount: parseFloat(cols[3]) || 0, description: cols[4] || 'Historical Import'
+                        created_at: new Date(cols[0]).toISOString(), category: cols[1], 
+                        vendor_name: cols[2] || '', amount: parseFloat(cols[3]) || 0, 
+                        description: cols[4] || 'Historical Import'
                     });
                 }
             }
@@ -430,8 +465,17 @@
 
             try {
                 const res = await fetch('/.netlify/functions/import-data', { method: 'POST', body: JSON.stringify({ table: type, records }) });
-                if (res.ok) { alert(`Successfully imported ${records.length} historical records!`); document.getElementById('import-box').style.display = 'none'; loadDashboardData(); } 
-                else { const err = await res.json(); alert(`Import failed: ${err.error}`); }
+                if (res.ok) { 
+                    // Also save the archived prices so they appear on the price sheet
+                    if (type === 'invoices') {
+                        const priceRecords = Object.values(uniquePrices);
+                        if (priceRecords.length > 0) {
+                            await fetch('/.netlify/functions/import-data', { method: 'POST', body: JSON.stringify({ table: 'price_sheet', records: priceRecords }) });
+                        }
+                    }
+                    alert(`Successfully imported historical records!`); 
+                    document.getElementById('import-box').style.display = 'none'; loadDashboardData(); 
+                } else { const err = await res.json(); alert(`Import failed: ${err.error}`); }
             } catch (err) { alert("Connection error."); }
         };
         reader.readAsText(file);
@@ -565,7 +609,13 @@
 
     // --- UTILS & PRINTING ---
     async function deleteDoc(id, docType) { if (confirm(`Delete ${docType}?`)) { await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
-    async function editPrice(id, name, currentPrice) { const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); if (newPrice) { await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); loadDashboardData(); } }
+    async function editPrice(id, name, currentPrice) { 
+        const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); 
+        if (newPrice) { 
+            await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); 
+            loadDashboardData(); 
+        } 
+    }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
     async function submitExpense(e) { e.preventDefault(); const btn = e.target.querySelector('button'); btn.innerText = 'Saving...'; try { await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); loadDashboardData(); btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); } catch(err) { alert('Error saving expense.'); btn.innerText = 'Save Expense'; } }
     async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
@@ -621,16 +671,66 @@
 
     function printPO(id) {
         const po = globalPOs.find(p => p.id === id);
-        const itemsHtml = po.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
+        
+        const itemsHtml = po.itemized_lines.map(item => `<tr>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.qty}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.line_total.toFixed(2)}</td>
+        </tr>`).join('');
+        
         const contactHtml = `${po.ic_email ? `Email: ${po.ic_email}<br>` : ''}${po.ic_phone ? `Phone: ${po.ic_phone}<br>` : ''}`;
         const cmtHtml = po.comments ? `<div style="margin-top:20px; padding:15px; background:#e3f2fd; border-left:4px solid #1565c0;"><strong>Instructions:</strong><br>${po.comments}</div>` : '';
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #1565c0;">Scope of Work</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #1565c0;">Qty</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Piece Rate</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Total Payout</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
+        
+        document.getElementById('print-section').innerHTML = `
+            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
+                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
+                <h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;">
+                    <div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div>
+                    <div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
+                    <thead>
+                        <tr style="background: #f4f6f9;">
+                            <th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #1565c0;">Scope of Work</th>
+                            <th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #1565c0;">Qty</th>
+                            <th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Piece Rate</th>
+                            <th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Total Payout</th>
+                        </tr>
+                    </thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+                <div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>
+                ${cmtHtml}
+            </div>`;
         setTimeout(() => window.print(), 500);
     }
 
     function printPriceSheet() {
-        const itemsHtml = globalPrices.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.category}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.unit}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td></tr>`).join('');
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2><table style="width: 100%; border-collapse: collapse; margin-top: 20px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #111;">Item Name</th><th style="padding: 10px; text-align: left; width: 25%; border-bottom: 2px solid #111;">Category</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #111;">Cost Unit</th><th style="padding: 10px; text-align: right; width: 15%; border-bottom: 2px solid #111;">Base Cost</th></tr></thead><tbody>${itemsHtml}</tbody></table></div>`;
+        const itemsHtml = globalPrices.map(item => `<tr>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.category}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.unit}</td>
+            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td>
+        </tr>`).join('');
+        
+        document.getElementById('print-section').innerHTML = `
+            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
+                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
+                <h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                    <thead>
+                        <tr style="background: #f4f6f9;">
+                            <th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #111;">Item Name</th>
+                            <th style="padding: 10px; text-align: left; width: 25%; border-bottom: 2px solid #111;">Category</th>
+                            <th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #111;">Cost Unit</th>
+                            <th style="padding: 10px; text-align: right; width: 15%; border-bottom: 2px solid #111;">Base Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>${itemsHtml}</tbody>
+                </table>
+            </div>`;
         setTimeout(() => window.print(), 500);
     }
 
