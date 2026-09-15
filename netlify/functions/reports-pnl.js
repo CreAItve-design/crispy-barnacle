@@ -8,6 +8,7 @@ exports.handler = async (event) => {
         let expQ = supabase.from('expenses').select('*');
         let poQ = supabase.from('purchase_orders').select('*');
 
+        // Apply date filters if they exist
         if (startDate) { 
             invQ = invQ.gte('issue_date', startDate); 
             expQ = expQ.gte('created_at', startDate); 
@@ -23,20 +24,34 @@ exports.handler = async (event) => {
         const [invData, expData, poData] = await Promise.all([invQ, expQ, poQ]);
 
         let totalRevenue = 0; let autoMat = 0;
+        
         invData.data.forEach(inv => {
             let rev = inv.status === 'Paid' ? inv.total_amount : (inv.deposit_paid || 0);
             totalRevenue += rev;
+            
             if (rev > 0 && inv.itemized_lines) {
-                inv.itemized_lines.forEach(line => { if (line.base_cost && line.base_cost < line.unit_price) autoMat += (line.base_cost * line.qty); });
+                inv.itemized_lines.forEach(line => { 
+                    // NEW LOGIC: Logs to COGS if category is Material OR if a markup is detected
+                    if (
+                        (line.category && line.category.toLowerCase().includes('material')) || 
+                        (line.base_cost && line.base_cost < line.unit_price)
+                    ) {
+                        autoMat += ((line.base_cost || 0) * (line.qty || 1)); 
+                    }
+                });
             }
         });
 
         let expByCat = {}; let totalExpenses = 0; let cTotals = {};
-        if (autoMat > 0) { expByCat["Materials (COGS)"] = autoMat; totalExpenses += autoMat; }
+        if (autoMat > 0) { 
+            expByCat["Materials (COGS)"] = autoMat; 
+            totalExpenses += autoMat; 
+        }
 
         expData.data.forEach(exp => {
             const cat = exp.category || 'Other';
-            expByCat[cat] = (expByCat[cat] || 0) + exp.amount; totalExpenses += exp.amount;
+            expByCat[cat] = (expByCat[cat] || 0) + exp.amount; 
+            totalExpenses += exp.amount;
             if (cat === '1099 Contractor / IC' && exp.vendor_name) {
                 let v = exp.vendor_name.trim().toLowerCase(); cTotals[v] = (cTotals[v] || 0) + exp.amount;
             }
@@ -49,6 +64,9 @@ exports.handler = async (event) => {
         });
 
         let flags1099 = Object.entries(cTotals).filter(([_, amt]) => amt >= 600).map(([n, a]) => `${n.toUpperCase()}: $${a.toFixed(2)}`);
+        
         return { statusCode: 200, body: JSON.stringify({ totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses, expensesByCategory: expByCat, flags1099 }) };
-    } catch (e) { return { statusCode: 500, body: JSON.stringify({ error: e.message }) }; }
+    } catch (e) { 
+        return { statusCode: 500, body: JSON.stringify({ error: e.message }) }; 
+    }
 };
