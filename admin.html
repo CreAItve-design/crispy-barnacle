@@ -96,9 +96,9 @@
             </div>
 
             <div class="stats-grid">
-                <div class="stat-card"><h3>Total Revenue</h3><p id="pnl-revenue">$0.00</p></div>
-                <div class="stat-card"><h3>Total Expenses</h3><p id="pnl-expenses">$0.00</p></div>
-                <div class="stat-card" style="border-color: #111;"><h3>Net Operating Profit</h3><p id="pnl-net" style="color: #2e7d32; font-weight:900;">$0.00</p></div>
+                <div class="stat-card"><h3>Total Revenue</h3><p id="pnl-revenue" style="color: #2e7d32;">$0.00</p></div>
+                <div class="stat-card"><h3>Total Expenses</h3><p id="pnl-expenses" style="color: #c62828;">$0.00</p></div>
+                <div class="stat-card" style="border-color: #111;"><h3>Net Operating Profit</h3><p id="pnl-net">$0.00</p></div>
             </div>
             <h3 style="margin-top: 30px; margin-bottom: 15px;">Expense Breakdown</h3>
             <div id="expense-breakdown">Loading...</div>
@@ -236,14 +236,14 @@
                         <option value="Materials (COGS)">Materials (COGS)</option>
                         <option value="Labor">Labor</option>
                         <option value="Job Supplies">Job Supplies</option>
-                        <option value="Subcontractors (1099)">Subcontractors (1099)</option>
-                        <option value="Owner's Pay">Owner's Pay</option>
+                        <option value="Subcontractors">Subcontractors (1099 / IC)</option>
+                        <option value="Owner's Pay">Owner's Pay / Payroll</option>
                         <option value="Office Expenses">Office Expenses</option>
-                        <option value="Company Meals (50% Deductible)">Meals (50% Deductible)</option>
+                        <option value="Meals">Company Meals</option>
                         <option value="Fees and Services">Fees and Services</option>
                         <option value="Maintenance / Repairs">Maintenance / Repairs</option>
                         <option value="Tools / Equipment">Tools / Equipment</option>
-                        <option value="Other / Miscellaneous">Other / Miscellaneous</option>
+                        <option value="Other">Other / Miscellaneous</option>
                     </select>
                 </div>
                 <div class="form-group"><input type="text" id="exp-vendor" placeholder="Vendor / Contractor Name (For 1099 Tracking)"></div>
@@ -259,17 +259,14 @@
     let draftLines = []; let draftTotal = 0; let editingDocId = null; let editingDocType = null;
     let poDraftLines = []; let poDraftTotal = 0; let currentInvForPO = null; let editingPOId = null;
 
-    async function handleLogin(e) { e.preventDefault(); const res = await fetch('/.netlify/functions/admin-auth', { method: 'POST', body: JSON.stringify({ password: document.getElementById('admin-pass').value }) }); if (res.ok) { sessionStorage.setItem('spotlight_admin', 'true'); document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } else { document.getElementById('login-error').innerText = 'Incorrect password.'; } }
-    
+    // PRELOAD LOGO SO IT PRINTS INSTANTLY
     window.onload = () => { 
-        if (sessionStorage.getItem('spotlight_admin') === 'true') { 
-            document.getElementById('login-screen').style.display = 'none'; 
-            document.getElementById('dashboard-screen').style.display = 'block'; 
-            loadDashboardData(); 
-        } 
-        // Auto-fill today's date in the Log Expenses tab
+        const img = new Image(); img.src = 'https://spotlight-tile.com/image.png';
+        if (sessionStorage.getItem('spotlight_admin') === 'true') { document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } 
         document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
     };
+
+    async function handleLogin(e) { e.preventDefault(); const res = await fetch('/.netlify/functions/admin-auth', { method: 'POST', body: JSON.stringify({ password: document.getElementById('admin-pass').value }) }); if (res.ok) { sessionStorage.setItem('spotlight_admin', 'true'); document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } else { document.getElementById('login-error').innerText = 'Incorrect password.'; } }
     
     function logout() { sessionStorage.removeItem('spotlight_admin'); location.reload(); }
     
@@ -310,13 +307,14 @@
                 window.currentPnLData = pnlData;
                 
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
-                document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
+                document.getElementById('pnl-expenses').innerText = `-$${pnlData.totalExpenses.toFixed(2)}`;
+                
                 const netEl = document.getElementById('pnl-net');
                 netEl.innerText = `$${pnlData.netProfit.toFixed(2)}`;
                 netEl.style.color = pnlData.netProfit >= 0 ? '#2e7d32' : '#c62828';
                 
                 if (pnlData.expensesByCategory && Object.keys(pnlData.expensesByCategory).length > 0) {
-                    document.getElementById('expense-breakdown').innerHTML = Object.entries(pnlData.expensesByCategory).map(([cat, amt]) => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${cat}</span><strong>$${amt.toFixed(2)}</strong></div>`).join('');
+                    document.getElementById('expense-breakdown').innerHTML = Object.entries(pnlData.expensesByCategory).map(([cat, amt]) => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${cat}</span><strong style="color:#c62828;">-$${amt.toFixed(2)}</strong></div>`).join('');
                 } else { document.getElementById('expense-breakdown').innerHTML = '<p style="color:#666;">No expenses logged.</p>'; }
                 
                 const flagBox = document.getElementById('1099-flags');
@@ -458,7 +456,6 @@
                     });
                     invoiceMap[dateKey].total_amount += lineTotal;
 
-                    // Tag old imported prices as archived
                     let pKey = cols[3] + " (Archived)";
                     if (!uniquePrices[pKey]) {
                         uniquePrices[pKey] = {
@@ -653,7 +650,6 @@
                 }) 
             }); 
             ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); 
-            // Reset the date field back to today after saving
             document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
             loadDashboardData(); 
             btn.innerText = 'Save Expense'; 
@@ -712,7 +708,7 @@
                 <div style="text-align: right;"><h3 style="margin-bottom: 5px;">Total: $${doc.total_amount.toFixed(2)}</h3>${balHtml}</div>
                 ${cmtHtml}
             </div>`;
-        setTimeout(() => window.print(), 500);
+        setTimeout(() => window.print(), 800);
     }
 
     function printPO(id) {
@@ -721,13 +717,13 @@
         const contactHtml = `${po.ic_email ? `Email: ${po.ic_email}<br>` : ''}${po.ic_phone ? `Phone: ${po.ic_phone}<br>` : ''}`;
         const cmtHtml = po.comments ? `<div style="margin-top:20px; padding:15px; background:#e3f2fd; border-left:4px solid #1565c0;"><strong>Instructions:</strong><br>${po.comments}</div>` : '';
         document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #1565c0;">Scope of Work</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #1565c0;">Qty</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Piece Rate</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Total Payout</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
-        setTimeout(() => window.print(), 500);
+        setTimeout(() => window.print(), 800);
     }
 
     function printPriceSheet() {
         const itemsHtml = globalPrices.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.category}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.unit}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td></tr>`).join('');
         document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2><table style="width: 100%; border-collapse: collapse; margin-top: 20px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #111;">Item Name</th><th style="padding: 10px; text-align: left; width: 25%; border-bottom: 2px solid #111;">Category</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #111;">Cost Unit</th><th style="padding: 10px; text-align: right; width: 15%; border-bottom: 2px solid #111;">Base Cost</th></tr></thead><tbody>${itemsHtml}</tbody></table></div>`;
-        setTimeout(() => window.print(), 500);
+        setTimeout(() => window.print(), 800);
     }
 
     function printPnL() {
@@ -738,15 +734,18 @@
         let breakdownRows = '';
         if (pnl && pnl.expensesByCategory) {
             for (const [cat, amt] of Object.entries(pnl.expensesByCategory)) {
-                breakdownRows += `<tr><td style="padding: 10px; border-bottom: 1px solid #ddd; padding-left: 20px;">${cat}</td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;">$${amt.toFixed(2)}</td></tr>`;
+                breakdownRows += `<tr><td style="padding: 10px; border-bottom: 1px solid #ddd; padding-left: 20px;">${cat}</td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd; color:#c62828;">-$${amt.toFixed(2)}</td></tr>`;
             }
         } else {
             breakdownRows = `<tr><td colspan="2" style="padding: 10px; text-align:center;">No expenses logged.</td></tr>`;
         }
 
+        const netProfitColor = (pnl && pnl.netProfit >= 0) ? '#2e7d32' : '#c62828';
+        const netProfitBg = (pnl && pnl.netProfit >= 0) ? '#e8f5e9' : '#ffebee';
+
         document.getElementById('print-section').innerHTML = `
             <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
-                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
+                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 100px;"></div>
                 <h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 10px; text-align:center;">Profit & Loss Report</h1>
                 <p style="text-align:center; color:#555; margin-bottom: 30px;">Dates: ${start} to ${end}</p>
                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; text-align: left;">
@@ -757,16 +756,16 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td style="padding: 10px; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>Total Revenue</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>$${(pnl ? pnl.totalRevenue : 0).toFixed(2)}</strong></td></tr>
-                        <tr><td style="padding: 10px; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>Total Expenses</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>$${(pnl ? pnl.totalExpenses : 0).toFixed(2)}</strong></td></tr>
-                        <tr style="background: #e8f5e9;"><td style="padding: 15px 10px; font-size:1.2rem;"><strong>Net Operating Profit</strong></td><td style="padding: 15px 10px; text-align:right; color: #2e7d32; font-size:1.2rem;"><strong>$${(pnl ? pnl.netProfit : 0).toFixed(2)}</strong></td></tr>
+                        <tr><td style="padding: 10px; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>Total Revenue</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd; font-size:1.1rem; color:#2e7d32;"><strong>$${(pnl ? pnl.totalRevenue : 0).toFixed(2)}</strong></td></tr>
+                        <tr><td style="padding: 10px; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>Total Expenses</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd; font-size:1.1rem; color:#c62828;"><strong>-$${(pnl ? pnl.totalExpenses : 0).toFixed(2)}</strong></td></tr>
+                        <tr style="background: ${netProfitBg};"><td style="padding: 15px 10px; font-size:1.2rem;"><strong>Net Operating Profit</strong></td><td style="padding: 15px 10px; text-align:right; color: ${netProfitColor}; font-size:1.2rem;"><strong>$${(pnl ? pnl.netProfit : 0).toFixed(2)}</strong></td></tr>
                         <tr style="background: #f4f6f9;"><td style="padding: 10px; font-weight:bold; color:#444;" colspan="2">Expense Breakdown</td></tr>
                         ${breakdownRows}
                     </tbody>
                 </table>
                 <div style="text-align: center; color: #666; margin-top: 50px; font-weight: bold; font-size: 1.2rem; letter-spacing: 2px;">SPOTLIGHT TILE LLC</div>
             </div>`;
-        setTimeout(() => window.print(), 500);
+        setTimeout(() => window.print(), 800);
     }
 
     function exportPriceSheetCSV() {
@@ -789,16 +788,16 @@
             const pnl = window.currentPnLData;
             let breakdownHtml = '';
             for (const [cat, amt] of Object.entries(pnl.expensesByCategory)) {
-                breakdownHtml += `<tr><td style="padding: 8px; border-bottom:1px solid #eee; padding-left: 20px;">${cat}</td><td style="padding: 8px; text-align:right; border-bottom:1px solid #eee;">$${amt.toFixed(2)}</td></tr>`;
+                breakdownHtml += `<tr><td style="padding: 8px; border-bottom:1px solid #eee; padding-left: 20px;">${cat}</td><td style="padding: 8px; text-align:right; border-bottom:1px solid #eee; color:#c62828;">-$${amt.toFixed(2)}</td></tr>`;
             }
             const bodyHtml = `<table style="width:100%; border-collapse:collapse;">${breakdownHtml}</table>`;
             
             await fetch('/.netlify/functions/email-report', { method: 'POST', body: JSON.stringify({ 
                 startDate: document.getElementById('pnl-start').value, 
                 endDate: document.getElementById('pnl-end').value, 
-                rev: '$' + pnl.totalRevenue.toFixed(2), 
-                exp: '$' + pnl.totalExpenses.toFixed(2), 
-                net: '$' + pnl.netProfit.toFixed(2), 
+                rev: '<span style="color:#2e7d32;">$' + pnl.totalRevenue.toFixed(2) + '</span>', 
+                exp: '<span style="color:#c62828;">-$' + pnl.totalExpenses.toFixed(2) + '</span>', 
+                net: '<span style="color:' + (pnl.netProfit >= 0 ? '#2e7d32' : '#c62828') + ';">$' + pnl.netProfit.toFixed(2) + '</span>', 
                 breakdownHtml: bodyHtml 
             }) }); 
             alert('Report emailed successfully!'); 
