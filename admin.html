@@ -28,6 +28,7 @@
         .toolbar { display: flex; gap: 15px; align-items: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #e5e5e5; margin-bottom: 20px; flex-wrap: wrap; }
         .flag-box { background: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: none; font-weight: bold; }
         
+        /* Strict PDF Print Layout Rules */
         @media print {
             @page { size: letter portrait; margin: 0.5in; }
             body.admin-body { background: white !important; padding: 0 !important; margin: 0 !important; }
@@ -278,7 +279,6 @@
                 
                 priceBody.innerHTML += `<tr style="${rowStyle}"><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price} ${editBtn}</td></tr>`;
                 
-                // Exclude archived items from active document builder
                 if (!isArchived) {
                     document.getElementById('b-item-select').innerHTML += `<option value="${item.id}">${item.item_name} - $${item.unit_price} / ${item.unit}</option>`;
                 }
@@ -424,9 +424,15 @@
                     if (!invoiceMap[dateKey]) {
                         invoiceMap[dateKey] = {
                             issue_date: new Date(cols[0]).toISOString(),
-                            client_name: cols[1], client_address: cols[2] || '',
-                            total_amount: 0, deposit_paid: parseFloat(cols[8]) || 0,
-                            status: cols[9] || 'Paid', comments: cols[10] || 'Historical Import',
+                            client_name: cols[1], 
+                            client_email: '', // Passed as blank to satisfy database NOT NULL constraint
+                            client_phone: '', // Passed as blank to satisfy database NOT NULL constraint
+                            po_job_name: cols[10] || '', // Using the notes field (INV number) as the PO Job Name
+                            client_address: cols[2] || '',
+                            total_amount: 0, 
+                            deposit_paid: parseFloat(cols[8]) || 0,
+                            status: cols[9] || 'Paid', 
+                            comments: cols[10] || 'Historical Import',
                             itemized_lines: []
                         };
                     }
@@ -609,13 +615,7 @@
 
     // --- UTILS & PRINTING ---
     async function deleteDoc(id, docType) { if (confirm(`Delete ${docType}?`)) { await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
-    async function editPrice(id, name, currentPrice) { 
-        const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); 
-        if (newPrice) { 
-            await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); 
-            loadDashboardData(); 
-        } 
-    }
+    async function editPrice(id, name, currentPrice) { const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); if (newPrice) { await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); loadDashboardData(); } }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
     async function submitExpense(e) { e.preventDefault(); const btn = e.target.querySelector('button'); btn.innerText = 'Saving...'; try { await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); loadDashboardData(); btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); } catch(err) { alert('Error saving expense.'); btn.innerText = 'Save Expense'; } }
     async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
@@ -671,66 +671,16 @@
 
     function printPO(id) {
         const po = globalPOs.find(p => p.id === id);
-        
-        const itemsHtml = po.itemized_lines.map(item => `<tr>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.qty}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.line_total.toFixed(2)}</td>
-        </tr>`).join('');
-        
+        const itemsHtml = po.itemized_lines.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.qty}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.line_total.toFixed(2)}</td></tr>`).join('');
         const contactHtml = `${po.ic_email ? `Email: ${po.ic_email}<br>` : ''}${po.ic_phone ? `Phone: ${po.ic_phone}<br>` : ''}`;
         const cmtHtml = po.comments ? `<div style="margin-top:20px; padding:15px; background:#e3f2fd; border-left:4px solid #1565c0;"><strong>Instructions:</strong><br>${po.comments}</div>` : '';
-        
-        document.getElementById('print-section').innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
-                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
-                <h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;">
-                    <div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div>
-                    <div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div>
-                </div>
-                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;">
-                    <thead>
-                        <tr style="background: #f4f6f9;">
-                            <th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #1565c0;">Scope of Work</th>
-                            <th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #1565c0;">Qty</th>
-                            <th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Piece Rate</th>
-                            <th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Total Payout</th>
-                        </tr>
-                    </thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-                <div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>
-                ${cmtHtml}
-            </div>`;
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #1565c0; padding-bottom:10px; color:#1565c0;">PURCHASE ORDER (PO-${po.id})</h2><div style="display: flex; justify-content: space-between; margin-bottom: 30px; margin-top:20px;"><div><strong>Contractor:</strong> ${po.ic_name}<br>${contactHtml}<strong>Labor Type:</strong> ${po.labor_type || 'N/A'}</div><div style="text-align: right;"><strong>Client Site:</strong> ${po.client_name}<br>${po.client_address || ''}<br><strong>Date:</strong> ${new Date(po.created_at).toLocaleDateString()}</div></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #1565c0;">Scope of Work</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #1565c0;">Qty</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Piece Rate</th><th style="padding: 10px; text-align: right; width: 20%; border-bottom: 2px solid #1565c0;">Total Payout</th></tr></thead><tbody>${itemsHtml}</tbody></table><div style="text-align: right;"><h3>PO Total: $${po.total_amount.toFixed(2)}</h3></div>${cmtHtml}</div>`;
         setTimeout(() => window.print(), 500);
     }
 
     function printPriceSheet() {
-        const itemsHtml = globalPrices.map(item => `<tr>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.category}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.unit}</td>
-            <td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td>
-        </tr>`).join('');
-        
-        document.getElementById('print-section').innerHTML = `
-            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
-                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
-                <h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                    <thead>
-                        <tr style="background: #f4f6f9;">
-                            <th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #111;">Item Name</th>
-                            <th style="padding: 10px; text-align: left; width: 25%; border-bottom: 2px solid #111;">Category</th>
-                            <th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #111;">Cost Unit</th>
-                            <th style="padding: 10px; text-align: right; width: 15%; border-bottom: 2px solid #111;">Base Cost</th>
-                        </tr>
-                    </thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-            </div>`;
+        const itemsHtml = globalPrices.map(item => `<tr><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.item_name}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:left;">${item.category}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:center;">${item.unit}</td><td style="padding:10px; border-bottom:1px solid #ddd; text-align:right;">$${item.unit_price.toFixed(2)}</td></tr>`).join('');
+        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h2 style="text-align:center; border-bottom: 2px solid #111; padding-bottom:10px;">Itemized Price Sheet</h2><table style="width: 100%; border-collapse: collapse; margin-top: 20px;"><thead><tr style="background: #f4f6f9;"><th style="padding: 10px; text-align: left; width: 45%; border-bottom: 2px solid #111;">Item Name</th><th style="padding: 10px; text-align: left; width: 25%; border-bottom: 2px solid #111;">Category</th><th style="padding: 10px; text-align: center; width: 15%; border-bottom: 2px solid #111;">Cost Unit</th><th style="padding: 10px; text-align: right; width: 15%; border-bottom: 2px solid #111;">Base Cost</th></tr></thead><tbody>${itemsHtml}</tbody></table></div>`;
         setTimeout(() => window.print(), 500);
     }
 
