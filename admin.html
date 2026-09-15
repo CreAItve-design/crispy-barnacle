@@ -29,8 +29,8 @@
         .flag-box { background: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: none; font-weight: bold; }
         
         /* Rapid Estimator Toggles */
-        .toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
-        .toggle-btn { background: #fff; border: 1px solid #ccc; padding: 12px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: bold; color: #666; transition: 0.2s; }
+        .toggle-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px; }
+        .toggle-btn { background: #fff; border: 1px solid #ccc; padding: 12px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: bold; color: #666; transition: 0.2s; font-size: 0.9rem;}
         .toggle-btn.active { background: #e3f2fd; border-color: #1565c0; color: #1565c0; }
         
         @media print {
@@ -88,6 +88,7 @@
                         <option value="Tub Surround">Bathtub Surround</option>
                         <option value="Floor Installation">Floor Installation</option>
                         <option value="Kitchen Backsplash">Kitchen Backsplash</option>
+                        <option value="Light Bathroom Remodel">Light Bathroom Remodel</option>
                     </select>
                 </div>
 
@@ -101,6 +102,15 @@
                     <div class="toggle-btn active" id="tog-water" onclick="toggleBtn(this); calculateRapidEst()">Waterproofing</div>
                     <div class="toggle-btn" id="tog-niche" onclick="toggleBtn(this); calculateRapidEst()">Add Niche (x1)</div>
                     <div class="toggle-btn active" id="tog-trash" onclick="toggleBtn(this); calculateRapidEst()">Trash / Bagster ($270)</div>
+                    <div class="toggle-btn" id="tog-base" onclick="toggleBtn(this); calculateRapidEst()">R&R Baseboards</div>
+                    <div class="toggle-btn" id="tog-toilet" onclick="toggleBtn(this); calculateRapidEst()">R&R Toilet</div>
+                    <div class="toggle-btn" id="tog-vanity" onclick="toggleBtn(this); calculateRapidEst()">Install Vanity</div>
+                    <div class="toggle-btn" id="tog-hardware" onclick="toggleBtn(this); calculateRapidEst()">Hardware & Fixtures</div>
+                    <div class="toggle-btn" id="tog-faucet" onclick="toggleBtn(this); calculateRapidEst()">Install Faucets</div>
+                    <div class="toggle-btn" id="tog-paint" onclick="toggleBtn(this); calculateRapidEst()">Painting</div>
+                    <div class="toggle-btn" id="tog-drywall" onclick="toggleBtn(this); calculateRapidEst()">Sheetrock/Drywall</div>
+                    <div class="toggle-btn" id="tog-stone" onclick="toggleBtn(this); calculateRapidEst()">Custom Stone Fab</div>
+                    <div class="toggle-btn" id="tog-tilemod" onclick="toggleBtn(this); calculateRapidEst()">Custom Tile Fab</div>
                 </div>
 
                 <textarea id="rapid-notes" rows="3" placeholder="Consultation Notes (Preferences, conditions, etc.)..." style="width:100%; padding:10px; font-family:sans-serif; margin-bottom: 15px;"></textarea>
@@ -295,14 +305,14 @@
                         <option value="Materials (COGS)">Materials (COGS)</option>
                         <option value="Labor">Labor</option>
                         <option value="Job Supplies">Job Supplies</option>
-                        <option value="Subcontractors">Subcontractors (1099 / IC)</option>
+                        <option value="Subcontractors (1099)">Subcontractors (1099)</option>
                         <option value="Owner's Pay">Owner's Pay / Payroll</option>
                         <option value="Office Expenses">Office Expenses</option>
-                        <option value="Meals">Company Meals</option>
+                        <option value="Company Meals (50% Deductible)">Meals (50% Deductible)</option>
                         <option value="Fees and Services">Fees and Services</option>
                         <option value="Maintenance / Repairs">Maintenance / Repairs</option>
                         <option value="Tools / Equipment">Tools / Equipment</option>
-                        <option value="Other">Other / Miscellaneous</option>
+                        <option value="Other / Miscellaneous">Other / Miscellaneous</option>
                     </select>
                 </div>
                 <div class="form-group"><input type="text" id="exp-vendor" placeholder="Vendor / Contractor Name (For 1099 Tracking)"></div>
@@ -339,25 +349,45 @@
     function calculateRapidEst() {
         const sqft = parseFloat(document.getElementById('rapid-sqft').value) || 0;
         const type = document.getElementById('rapid-type').value;
+        
         const hasDemo = document.getElementById('tog-demo').classList.contains('active');
         const hasWater = document.getElementById('tog-water').classList.contains('active');
         const hasNiche = document.getElementById('tog-niche').classList.contains('active');
         const hasTrash = document.getElementById('tog-trash').classList.contains('active');
 
+        const hasBase = document.getElementById('tog-base').classList.contains('active');
+        const hasToilet = document.getElementById('tog-toilet').classList.contains('active');
+        const hasVanity = document.getElementById('tog-vanity').classList.contains('active');
+        const hasHardware = document.getElementById('tog-hardware').classList.contains('active');
+        const hasFaucet = document.getElementById('tog-faucet').classList.contains('active');
+        const hasPaint = document.getElementById('tog-paint').classList.contains('active');
+        const hasDrywall = document.getElementById('tog-drywall').classList.contains('active');
+        const hasStone = document.getElementById('tog-stone').classList.contains('active');
+        const hasTileMod = document.getElementById('tog-tilemod').classList.contains('active');
+
         // Rough Field Math Rules
-        // Standard baseline: Labor ~$18/sf, Underlayment/Thinest ~$12/sf = $30/sf avg.
         let baseCost = sqft * 30; 
         
-        if (type === 'Shower Build') baseCost += 1500; // Pan/Curb/Drain extra labor
-        if (type === 'Tub Surround') baseCost += 600;  // Tub flange prep
-        if (type === 'Kitchen Backsplash') baseCost = sqft * 35; // Detail work higher $/sf
+        if (type === 'Shower Build') baseCost += 1500; 
+        if (type === 'Tub Surround') baseCost += 600;  
+        if (type === 'Kitchen Backsplash') baseCost = sqft * 35; 
+        if (type === 'Light Bathroom Remodel') baseCost += 800; // Baseline buffer
         
-        if (hasDemo) baseCost += (sqft * 8) + 200; // Demo labor buffer
+        if (hasDemo) baseCost += (sqft * 8) + 200; 
         if (hasWater) baseCost += 150;
         if (hasNiche) baseCost += 250;
         if (hasTrash) baseCost += 270;
 
-        // Give a safe -5% to +15% range for the field
+        if (hasBase) baseCost += 200; 
+        if (hasToilet) baseCost += 150; 
+        if (hasVanity) baseCost += 300; 
+        if (hasHardware) baseCost += 100;
+        if (hasFaucet) baseCost += 150;
+        if (hasPaint) baseCost += 250;
+        if (hasDrywall) baseCost += 300;
+        if (hasStone) baseCost += 400; 
+        if (hasTileMod) baseCost += 250; 
+
         const low = Math.floor(baseCost * 0.95 / 50) * 50; 
         const high = Math.ceil(baseCost * 1.15 / 50) * 50;
         
@@ -373,7 +403,7 @@
                 img.src = event.target.result;
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 800; // Compress heavily for fast database storage
+                    const MAX_WIDTH = 800; 
                     const scaleSize = MAX_WIDTH / img.width;
                     canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
                     const ctx = canvas.getContext('2d');
@@ -777,7 +807,6 @@
         } 
     }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
-    
     async function submitExpense(e) { 
         e.preventDefault(); 
         const btn = e.target.querySelector('button'); 
