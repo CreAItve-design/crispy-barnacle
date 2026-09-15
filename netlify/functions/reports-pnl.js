@@ -8,7 +8,6 @@ exports.handler = async (event) => {
         let expQ = supabase.from('expenses').select('*');
         let poQ = supabase.from('purchase_orders').select('*');
 
-        // Apply date filters if they exist
         if (startDate) { 
             invQ = invQ.gte('issue_date', startDate); 
             expQ = expQ.gte('created_at', startDate); 
@@ -23,7 +22,22 @@ exports.handler = async (event) => {
 
         const [invData, expData, poData] = await Promise.all([invQ, expQ, poQ]);
 
-        let totalRevenue = 0; let autoMat = 0;
+        let totalRevenue = 0; 
+        let expByCat = {
+            "Materials (COGS)": 0,
+            "Labor": 0,
+            "Job Supplies": 0,
+            "Subcontractors": 0,
+            "Owner's Pay": 0,
+            "Office Expenses": 0,
+            "Meals": 0,
+            "Fees and Services": 0,
+            "Maintenance / Repairs": 0,
+            "Tools / Equipment": 0,
+            "Other": 0
+        };
+        let totalExpenses = 0; 
+        let cTotals = {};
         
         invData.data.forEach(inv => {
             let rev = inv.status === 'Paid' ? inv.total_amount : (inv.deposit_paid || 0);
@@ -31,40 +45,62 @@ exports.handler = async (event) => {
             
             if (rev > 0 && inv.itemized_lines) {
                 inv.itemized_lines.forEach(line => { 
-                    // NEW LOGIC: Logs to COGS if category is Material OR if a markup is detected
-                    if (
-                        (line.category && line.category.toLowerCase().includes('material')) || 
-                        (line.base_cost && line.base_cost < line.unit_price)
-                    ) {
-                        autoMat += ((line.base_cost || 0) * (line.qty || 1)); 
+                    let cat = line.category ? line.category.toLowerCase() : '';
+                    let cost = (line.base_cost || 0) * (line.qty || 1);
+                    
+                    if (cost > 0) {
+                        // COGS mapping logic from invoices
+                        if (cat.includes('material') || (line.base_cost < line.unit_price)) {
+                            expByCat["Materials (COGS)"] += cost;
+                            totalExpenses += cost;
+                        } 
                     }
                 });
             }
         });
 
-        let expByCat = {}; let totalExpenses = 0; let cTotals = {};
-        if (autoMat > 0) { 
-            expByCat["Materials (COGS)"] = autoMat; 
-            totalExpenses += autoMat; 
-        }
-
         expData.data.forEach(exp => {
-            const cat = exp.category || 'Other';
-            expByCat[cat] = (expByCat[cat] || 0) + exp.amount; 
+            let catName = exp.category || 'Other';
+            let catLower = catName.toLowerCase();
+            let bucket = "Other";
+
+            if (catLower.includes('material') || catLower.includes('cogs')) bucket = "Materials (COGS)";
+            else if (catLower.includes('job supplies')) bucket = "Job Supplies";
+            else if (catLower.includes('1099') || catLower.includes('subcontractor') || catLower.includes('ic')) bucket = "Subcontractors";
+            else if (catLower.includes('payroll') || catLower.includes('owner')) bucket = "Owner's Pay";
+            else if (catLower.includes('office') || catLower.includes('software') || catLower.includes('technology') || catLower.includes('utilities')) bucket = "Office Expenses";
+            else if (catLower.includes('meal')) bucket = "Meals";
+            else if (catLower.includes('tax') || catLower.includes('accounting') || catLower.includes('credit card') || catLower.includes('debt') || catLower.includes('fee') || catLower.includes('service')) bucket = "Fees and Services";
+            else if (catLower.includes('repair') || catLower.includes('maintenance') || catLower.includes('vehicle') || catLower.includes('fuel')) bucket = "Maintenance / Repairs";
+            else if (catLower.includes('tool') || catLower.includes('equipment')) bucket = "Tools / Equipment";
+            else if (catLower.includes('labor')) bucket = "Labor";
+
+            expByCat[bucket] += exp.amount; 
             totalExpenses += exp.amount;
-            if (cat === '1099 Contractor / IC' && exp.vendor_name) {
-                let v = exp.vendor_name.trim().toLowerCase(); cTotals[v] = (cTotals[v] || 0) + exp.amount;
+
+            // 1099 Tracking
+            if (bucket === 'Subcontractors' && exp.vendor_name) {
+                let v = exp.vendor_name.trim().toLowerCase(); 
+                cTotals[v] = (cTotals[v] || 0) + exp.amount;
             }
         });
 
         poData.data.forEach(po => {
-            expByCat['Purchase Orders (IC Labor)'] = (expByCat['Purchase Orders (IC Labor)'] || 0) + po.total_amount;
+            expByCat['Subcontractors'] += po.total_amount;
             totalExpenses += po.total_amount;
-            if (po.ic_name) { let v = po.ic_name.trim().toLowerCase(); cTotals[v] = (cTotals[v] || 0) + po.total_amount; }
+            if (po.ic_name) { 
+                let v = po.ic_name.trim().toLowerCase(); 
+                cTotals[v] = (cTotals[v] || 0) + po.total_amount; 
+            }
         });
 
         let flags1099 = Object.entries(cTotals).filter(([_, amt]) => amt >= 600).map(([n, a]) => `${n.toUpperCase()}: $${a.toFixed(2)}`);
         
+        // Clean up empty categories
+        for (let key in expByCat) {
+            if (expByCat[key] === 0) delete expByCat[key];
+        }
+
         return { statusCode: 200, body: JSON.stringify({ totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses, expensesByCategory: expByCat, flags1099 }) };
     } catch (e) { 
         return { statusCode: 500, body: JSON.stringify({ error: e.message }) }; 

@@ -229,19 +229,17 @@
             <form onsubmit="submitExpense(event)" style="max-width: 500px;">
                 <div class="form-group">
                     <select id="exp-category" required>
-                        <option value="Payroll (Owner / W2)">Payroll (Owner / W2)</option>
-                        <option value="1099 Contractor / IC">1099 Contractor / IC</option>
-                        <option value="Job Supplies / Materials">Job Supplies / Materials</option>
-                        <option value="Office Supplies">Office Supplies</option>
-                        <option value="Technology & Software">Technology & Software</option>
-                        <option value="Credit Card / Debt Service">Credit Card / Debt Service</option>
-                        <option value="Utilities">Utilities</option>
-                        <option value="Equipment Repairs">Equipment Repairs</option>
-                        <option value="Company Meals (50% Deductible)">Company Meals (50% Deductible)</option>
-                        <option value="Vehicle / Fuel">Vehicle & Gas</option>
-                        <option value="Tools & Equipment">Tools & Equipment</option>
-                        <option value="Taxes / Accounting Fees">Taxes / Accounting Fees</option>
-                        <option value="Miscellaneous">Miscellaneous</option>
+                        <option value="Materials (COGS)">Materials (COGS)</option>
+                        <option value="Labor">Labor</option>
+                        <option value="Job Supplies">Job Supplies</option>
+                        <option value="Subcontractors (1099)">Subcontractors (1099)</option>
+                        <option value="Owner's Pay">Owner's Pay</option>
+                        <option value="Office Expenses">Office Expenses</option>
+                        <option value="Company Meals (50% Deductible)">Meals (50% Deductible)</option>
+                        <option value="Fees and Services">Fees and Services</option>
+                        <option value="Maintenance / Repairs">Maintenance / Repairs</option>
+                        <option value="Tools / Equipment">Tools / Equipment</option>
+                        <option value="Other / Miscellaneous">Other / Miscellaneous</option>
                     </select>
                 </div>
                 <div class="form-group"><input type="text" id="exp-vendor" placeholder="Vendor / Contractor Name (For 1099 Tracking)"></div>
@@ -295,6 +293,8 @@
             const pnlRes = await fetch(pnlUrl);
             if (pnlRes.ok) {
                 const pnlData = await pnlRes.json();
+                window.currentPnLData = pnlData; // Save globally for clean PDF generation
+                
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
                 document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
                 const netEl = document.getElementById('pnl-net');
@@ -303,7 +303,7 @@
                 
                 if (pnlData.expensesByCategory && Object.keys(pnlData.expensesByCategory).length > 0) {
                     document.getElementById('expense-breakdown').innerHTML = Object.entries(pnlData.expensesByCategory).map(([cat, amt]) => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee;"><span>${cat}</span><strong>$${amt.toFixed(2)}</strong></div>`).join('');
-                } else { document.getElementById('expense-breakdown').innerHTML = '<p style="color:#666;">No expenses.</p>'; }
+                } else { document.getElementById('expense-breakdown').innerHTML = '<p style="color:#666;">No expenses logged.</p>'; }
                 
                 const flagBox = document.getElementById('1099-flags');
                 if (pnlData.flags1099 && pnlData.flags1099.length > 0) {
@@ -425,9 +425,9 @@
                         invoiceMap[dateKey] = {
                             issue_date: new Date(cols[0]).toISOString(),
                             client_name: cols[1], 
-                            client_email: '', // Passed as blank to satisfy database NOT NULL constraint
-                            client_phone: '', // Passed as blank to satisfy database NOT NULL constraint
-                            po_job_name: cols[10] || '', // Using the notes field (INV number) as the PO Job Name
+                            client_email: '',
+                            client_phone: '',
+                            po_job_name: cols[10] || '',
                             client_address: cols[2] || '',
                             total_amount: 0, 
                             deposit_paid: parseFloat(cols[8]) || 0,
@@ -472,7 +472,6 @@
             try {
                 const res = await fetch('/.netlify/functions/import-data', { method: 'POST', body: JSON.stringify({ table: type, records }) });
                 if (res.ok) { 
-                    // Also save the archived prices so they appear on the price sheet
                     if (type === 'invoices') {
                         const priceRecords = Object.values(uniquePrices);
                         if (priceRecords.length > 0) {
@@ -615,9 +614,26 @@
 
     // --- UTILS & PRINTING ---
     async function deleteDoc(id, docType) { if (confirm(`Delete ${docType}?`)) { await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
-    async function editPrice(id, name, currentPrice) { const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); if (newPrice) { await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); loadDashboardData(); } }
+    async function editPrice(id, name, currentPrice) { 
+        const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); 
+        if (newPrice) { 
+            await fetch('/.netlify/functions/update-price', { method: 'PUT', body: JSON.stringify({ id, new_price: newPrice }) }); 
+            loadDashboardData(); 
+        } 
+    }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
-    async function submitExpense(e) { e.preventDefault(); const btn = e.target.querySelector('button'); btn.innerText = 'Saving...'; try { await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); loadDashboardData(); btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); } catch(err) { alert('Error saving expense.'); btn.innerText = 'Save Expense'; } }
+    async function submitExpense(e) { 
+        e.preventDefault(); 
+        const btn = e.target.querySelector('button'); btn.innerText = 'Saving...'; 
+        try { 
+            await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); 
+            ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); 
+            loadDashboardData(); 
+            btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); 
+        } catch(err) { 
+            alert('Error saving expense.'); btn.innerText = 'Save Expense'; 
+        } 
+    }
     async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
     async function sendEstimate(id) { if (confirm('Email Estimate?')) { alert('Sending...'); await fetch('/.netlify/functions/send-estimate', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
 
@@ -685,7 +701,41 @@
     }
 
     function printPnL() {
-        document.getElementById('print-section').innerHTML = `<div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;"><div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div><h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 20px;">Profit & Loss Report</h1><p><strong>Dates:</strong> ${document.getElementById('pnl-start').value || 'All Time'} to ${document.getElementById('pnl-end').value || 'Present'}</p><table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;"><tr style="background: #f4f6f9;"><th style="padding: 10px;">Category</th><th style="padding: 10px; text-align:right;">Amount</th></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Revenue</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-revenue').innerText}</strong></td></tr><tr><td style="padding: 10px; border-bottom: 1px solid #ddd;"><strong>Total Expenses</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;"><strong>${document.getElementById('pnl-expenses').innerText}</strong></td></tr><tr style="background: #e8f5e9;"><td style="padding: 10px;"><strong>Net Operating Profit</strong></td><td style="padding: 10px; text-align:right; color: #2e7d32;"><strong>${document.getElementById('pnl-net').innerText}</strong></td></tr></table><h3 style="margin-top: 30px;">Expense Breakdown</h3><div style="border: 1px solid #ddd; padding: 15px; border-radius: 6px;">${document.getElementById('expense-breakdown').innerHTML}</div></div>`;
+        const start = document.getElementById('pnl-start').value || 'All Time';
+        const end = document.getElementById('pnl-end').value || 'Present';
+        const pnl = window.currentPnLData;
+        
+        let breakdownRows = '';
+        if (pnl && pnl.expensesByCategory) {
+            for (const [cat, amt] of Object.entries(pnl.expensesByCategory)) {
+                breakdownRows += `<tr><td style="padding: 10px; border-bottom: 1px solid #ddd; padding-left: 20px;">${cat}</td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd;">$${amt.toFixed(2)}</td></tr>`;
+            }
+        } else {
+            breakdownRows = `<tr><td colspan="2" style="padding: 10px; text-align:center;">No expenses logged.</td></tr>`;
+        }
+
+        document.getElementById('print-section').innerHTML = `
+            <div style="max-width: 800px; margin: 0 auto; font-family: sans-serif; color: #111;">
+                <div style="text-align: center; margin-bottom: 20px;"><img src="https://spotlight-tile.com/image.png" style="max-height: 80px;"></div>
+                <h1 style="border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 10px; text-align:center;">Profit & Loss Report</h1>
+                <p style="text-align:center; color:#555; margin-bottom: 30px;">Dates: ${start} to ${end}</p>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 40px; text-align: left;">
+                    <thead>
+                        <tr style="background: #111; color: #fff;">
+                            <th style="padding: 12px 10px;">CATEGORY</th>
+                            <th style="padding: 12px 10px; text-align:right;">AMOUNT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td style="padding: 10px; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>Total Revenue</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>$${(pnl ? pnl.totalRevenue : 0).toFixed(2)}</strong></td></tr>
+                        <tr><td style="padding: 10px; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>Total Expenses</strong></td><td style="padding: 10px; text-align:right; border-bottom: 1px solid #ddd; font-size:1.1rem;"><strong>$${(pnl ? pnl.totalExpenses : 0).toFixed(2)}</strong></td></tr>
+                        <tr style="background: #e8f5e9;"><td style="padding: 15px 10px; font-size:1.2rem;"><strong>Net Operating Profit</strong></td><td style="padding: 15px 10px; text-align:right; color: #2e7d32; font-size:1.2rem;"><strong>$${(pnl ? pnl.netProfit : 0).toFixed(2)}</strong></td></tr>
+                        <tr style="background: #f4f6f9;"><td style="padding: 10px; font-weight:bold; color:#444;" colspan="2">Expense Breakdown</td></tr>
+                        ${breakdownRows}
+                    </tbody>
+                </table>
+                <div style="text-align: center; color: #666; margin-top: 50px; font-weight: bold; font-size: 1.2rem; letter-spacing: 2px;">SPOTLIGHT TILE LLC</div>
+            </div>`;
         setTimeout(() => window.print(), 500);
     }
 
@@ -704,7 +754,26 @@
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
-    async function emailPnL() { if (confirm('Email this report to yourself?')) { await fetch('/.netlify/functions/email-report', { method: 'POST', body: JSON.stringify({ startDate: document.getElementById('pnl-start').value, endDate: document.getElementById('pnl-end').value, rev: document.getElementById('pnl-revenue').innerText, exp: document.getElementById('pnl-expenses').innerText, net: document.getElementById('pnl-net').innerText, breakdownHtml: document.getElementById('expense-breakdown').innerHTML }) }); alert('Report emailed successfully!'); } }
+    async function emailPnL() { 
+        if (confirm('Email this report to yourself?')) { 
+            const pnl = window.currentPnLData;
+            let breakdownHtml = '';
+            for (const [cat, amt] of Object.entries(pnl.expensesByCategory)) {
+                breakdownHtml += `<tr><td style="padding: 8px; border-bottom:1px solid #eee; padding-left: 20px;">${cat}</td><td style="padding: 8px; text-align:right; border-bottom:1px solid #eee;">$${amt.toFixed(2)}</td></tr>`;
+            }
+            const bodyHtml = `<table style="width:100%; border-collapse:collapse;">${breakdownHtml}</table>`;
+            
+            await fetch('/.netlify/functions/email-report', { method: 'POST', body: JSON.stringify({ 
+                startDate: document.getElementById('pnl-start').value, 
+                endDate: document.getElementById('pnl-end').value, 
+                rev: '$' + pnl.totalRevenue.toFixed(2), 
+                exp: '$' + pnl.totalExpenses.toFixed(2), 
+                net: '$' + pnl.netProfit.toFixed(2), 
+                breakdownHtml: bodyHtml 
+            }) }); 
+            alert('Report emailed successfully!'); 
+        } 
+    }
 </script>
 </body>
 </html>
