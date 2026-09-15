@@ -17,9 +17,13 @@
         .stat-card { background: #fdfdfd; border: 1px solid #e5e5e5; padding: 20px; border-radius: 6px; text-align: center; }
         .stat-card h3 { font-size: 0.85rem; color: #666; text-transform: uppercase; margin-bottom: 8px; }
         .stat-card p { font-size: 1.8rem; font-weight: 700; color: #111; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; font-size: 0.9rem; }
+        
+        /* Table handling for mobile */
+        .table-responsive { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; margin-bottom: 30px; font-size: 0.9rem; min-width: 600px; }
         th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #e5e5e5; }
         th { background: #fafafa; font-weight: 600; text-transform: uppercase; font-size: 0.8rem; color: #555; }
+        
         .action-btn { padding: 6px 12px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; border: none; border-radius: 4px; cursor: pointer; background: #111; color: #fff; }
         .action-btn:hover { background: #333; }
         .form-group { margin-bottom: 15px; }
@@ -55,8 +59,8 @@
     </div>
 
     <div id="dashboard-screen" class="admin-container" style="display: none;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h1 style="font-size: 2rem;">Spotlight Tile Management</h1>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+            <h1 style="font-size: 2rem; margin: 0;">Spotlight Tile Management</h1>
             <button onclick="logout()" class="action-btn" style="background: #c62828;">Log Out</button>
         </div>
 
@@ -70,20 +74,20 @@
 
         <!-- NEW TAB: RAPID ESTIMATOR -->
         <div id="tab-rapid" class="tab-content active">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h2>In-Field Consultation Tool</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                <h2 style="margin: 0;">In-Field Consultation Tool</h2>
                 <h1 id="live-est-display" style="color: #2e7d32; margin: 0;">$0 - $0</h1>
             </div>
             <p style="color: #666; margin-bottom: 20px;">Provide instant rough numbers to clients and save photos to the database for later.</p>
 
             <div class="builder-box">
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="rapid-client" placeholder="Prospect Name *" style="flex:1; padding:12px; font-size: 1.1rem;" required>
-                    <input type="tel" id="rapid-phone" placeholder="Phone Number" style="flex:1; padding:12px; font-size: 1.1rem;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <input type="text" id="rapid-client" placeholder="Prospect Name *" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:12px; font-size: 1.1rem;" required>
+                    <input type="tel" id="rapid-phone" placeholder="Phone Number" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:12px; font-size: 1.1rem;">
                 </div>
                 
                 <div class="form-group">
-                    <select id="rapid-type" style="padding:12px; font-size: 1.1rem; font-weight: bold;" onchange="calculateRapidEst()">
+                    <select id="rapid-type" style="padding:12px; font-size: 1.1rem; font-weight: bold; width: 100%; box-sizing: border-box;" onchange="calculateRapidEst()">
                         <option value="Shower Build">Custom Shower Build</option>
                         <option value="Tub Surround">Bathtub Surround</option>
                         <option value="Floor Installation">Floor Installation</option>
@@ -92,9 +96,9 @@
                     </select>
                 </div>
 
-                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
-                    <strong style="width: 120px;">Rough Sq Ft:</strong>
-                    <input type="number" id="rapid-sqft" value="80" style="padding:12px; width: 100px; font-size: 1.1rem;" oninput="calculateRapidEst()">
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px; flex-wrap: wrap;">
+                    <strong style="min-width: 120px;">Rough Sq Ft:</strong>
+                    <input type="number" id="rapid-sqft" value="80" style="padding:12px; width: 120px; font-size: 1.1rem;" oninput="calculateRapidEst()">
                 </div>
 
                 <div class="toggle-grid">
@@ -113,23 +117,25 @@
                     <div class="toggle-btn" id="tog-tilemod" onclick="toggleBtn(this); calculateRapidEst()">Custom Tile Fab</div>
                 </div>
 
-                <textarea id="rapid-notes" rows="3" placeholder="Consultation Notes (Preferences, conditions, etc.)..." style="width:100%; padding:10px; font-family:sans-serif; margin-bottom: 15px;"></textarea>
+                <textarea id="rapid-notes" rows="3" placeholder="Consultation Notes (Preferences, conditions, etc.)..." style="width:100%; box-sizing: border-box; padding:10px; font-family:sans-serif; margin-bottom: 15px;"></textarea>
                 
-                <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
-                    <div>
+                <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+                    <div style="flex: 1 1 250px; min-width: 0;">
                         <strong style="display: block; margin-bottom: 5px;">Take Project Photo</strong>
-                        <input type="file" accept="image/*" capture="environment" id="rapid-photo" style="font-size: 0.9rem;">
+                        <input type="file" accept="image/*" capture="environment" id="rapid-photo" style="font-size: 0.9rem; max-width: 100%;">
                     </div>
-                    <button class="action-btn" style="background: #e65100; padding: 12px 25px; font-size: 1rem;" onclick="saveRapidProspect(this)">Save Prospect</button>
+                    <button class="action-btn" style="background: #e65100; padding: 12px 25px; font-size: 1rem; flex: 1 1 200px; width: 100%;" onclick="saveRapidProspect(this)">Save Prospect</button>
                 </div>
                 <p id="rapid-msg" style="text-align: right; color: #2e7d32; font-weight: bold; margin-top: 10px;"></p>
             </div>
             
             <h3 style="border-bottom: 2px solid #111; padding-bottom: 5px;">Recent Prospects</h3>
-            <table>
-                <thead><tr><th>Date</th><th>Prospect</th><th>Project</th><th>Est. Range</th></tr></thead>
-                <tbody id="prospects-table-body"><tr><td colspan="4">Loading prospects...</td></tr></tbody>
-            </table>
+            <div class="table-responsive">
+                <table>
+                    <thead><tr><th>Date</th><th>Prospect</th><th>Project</th><th>Est. Range</th></tr></thead>
+                    <tbody id="prospects-table-body"><tr><td colspan="4">Loading prospects...</td></tr></tbody>
+                </table>
+            </div>
         </div>
 
         <!-- TAB 1: P&L SUMMARY -->
@@ -153,13 +159,13 @@
                 <h3 style="color: #e65100; margin-bottom: 10px;">Import Historical Data (CSV)</h3>
                 <p style="font-size: 0.9rem; margin-bottom: 15px; color:#555;">Upload old line-item invoices or expenses to reconstruct historical P&L.</p>
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center; flex-wrap: wrap;">
-                    <select id="import-type" style="padding: 8px; flex: 1; border: 1px solid #ccc; border-radius: 4px;">
+                    <select id="import-type" style="padding: 8px; flex: 1 1 200px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
                         <option value="invoices">Import Invoices</option>
                         <option value="expenses">Import Expenses</option>
                     </select>
-                    <button class="action-btn" style="background: #444;" onclick="downloadImportTemplate()">1. Download Template</button>
-                    <input type="file" id="csv-file" accept=".csv" style="flex: 2; padding: 5px; background: #fff; border: 1px solid #ccc; border-radius: 4px;">
-                    <button class="action-btn" style="background: #e65100;" onclick="processImport()">2. Upload & Import</button>
+                    <button class="action-btn" style="background: #444; flex: 1 1 200px;" onclick="downloadImportTemplate()">1. Download Template</button>
+                    <input type="file" id="csv-file" accept=".csv" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding: 5px; background: #fff; border: 1px solid #ccc; border-radius: 4px;">
+                    <button class="action-btn" style="background: #e65100; flex: 1 1 200px;" onclick="processImport()">2. Upload & Import</button>
                 </div>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('import-box').style.display='none'">Close</button></div>
             </div>
@@ -175,8 +181,8 @@
 
         <!-- TAB 2: ESTIMATES, INVOICES & POs -->
         <div id="tab-estimates" class="tab-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>Active Documents</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
+                <h2 style="margin: 0;">Active Documents</h2>
                 <button class="action-btn" onclick="openBuilder()">+ Create Client Document</button>
             </div>
 
@@ -188,17 +194,17 @@
                     <label style="font-weight:bold;"><input type="radio" name="doc_type" value="Invoice" onchange="toggleDeposit(this.value)"> Invoice</label>
                 </div>
                 <datalist id="saved-clients"></datalist>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="b-name" list="saved-clients" placeholder="Client Name *" style="flex:1; padding:8px;" required>
-                    <input type="email" id="b-email" placeholder="Email Address" style="flex:1; padding:8px;">
-                    <input type="tel" id="b-phone" placeholder="Phone Number" style="flex:1; padding:8px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <input type="text" id="b-name" list="saved-clients" placeholder="Client Name *" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;" required>
+                    <input type="email" id="b-email" placeholder="Email Address" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
+                    <input type="tel" id="b-phone" placeholder="Phone Number" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
                 </div>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="b-address" placeholder="Property Address" style="flex:2; padding:8px;">
-                    <input type="text" id="b-project" placeholder="Project Type" style="flex:1; padding:8px;">
-                    <input type="text" id="b-po" placeholder="PO / Job Name" style="flex:1; padding:8px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <input type="text" id="b-address" placeholder="Property Address" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
+                    <input type="text" id="b-project" placeholder="Project Type" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
+                    <input type="text" id="b-po" placeholder="PO / Job Name" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
                 </div>
-                <textarea id="b-comments" rows="2" placeholder="Notes / Comments for Client..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
+                <textarea id="b-comments" rows="2" placeholder="Notes / Comments for Client..." style="width:100%; box-sizing: border-box; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
                 <div id="deposit-container" style="display: none; margin-bottom: 15px; align-items: center; gap: 10px;">
                     <label style="font-weight: bold;">Initial Deposit Paid: $</label>
                     <input type="number" id="b-deposit" value="0" step="0.01" style="padding:8px; width: 120px;">
@@ -206,24 +212,26 @@
                 
                 <!-- DUAL ITEM ADDER -->
                 <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd; margin-bottom: 15px;">
-                    <div style="display: flex; gap: 10px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 10px;">
-                        <strong style="min-width: 130px;">Price Sheet Item:</strong>
-                        <select id="b-item-select" style="flex:2; padding:8px;"><option value="">-- Select Material / Labor --</option></select>
-                        <input type="number" id="b-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
-                        <button class="action-btn" onclick="addLineItem()">Add</button>
+                    <div style="display: flex; gap: 10px; align-items: center; padding-bottom: 10px; border-bottom: 1px solid #eee; margin-bottom: 10px; flex-wrap: wrap;">
+                        <strong style="min-width: 130px; flex: 1 1 100%;">Price Sheet Item:</strong>
+                        <select id="b-item-select" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;"><option value="">-- Select Material / Labor --</option></select>
+                        <input type="number" id="b-qty" placeholder="Qty" style="width: 80px; flex: 1 1 80px; box-sizing: border-box; padding:8px;" min="0.1" step="0.1">
+                        <button class="action-btn" style="flex: 1 1 100px;" onclick="addLineItem()">Add</button>
                     </div>
-                    <div style="display: flex; gap: 10px; align-items: center;">
-                        <strong style="min-width: 130px; color:#d35400;">Custom Item:</strong>
-                        <input type="text" id="b-custom-name" placeholder="Custom Desc. (e.g., Family Discount)" style="flex:2; padding:8px;">
-                        <div style="display: flex; align-items: center; gap: 5px;">
-                            $ <input type="number" id="b-custom-price" placeholder="Unit Price" style="width: 90px; padding:8px;" step="0.01">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <strong style="min-width: 130px; color:#d35400; flex: 1 1 100%;">Custom Item:</strong>
+                        <input type="text" id="b-custom-name" placeholder="Custom Desc. (e.g., Family Discount)" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
+                        <div style="display: flex; align-items: center; gap: 5px; flex: 1 1 120px;">
+                            $ <input type="number" id="b-custom-price" placeholder="Unit Price" style="width: 100%; box-sizing: border-box; padding:8px;" step="0.01">
                         </div>
-                        <input type="number" id="b-custom-qty" placeholder="Qty" style="width: 80px; padding:8px;" min="0.1" step="0.1">
-                        <button class="action-btn" style="background:#e67e22;" onclick="addCustomLineItem()">Add Custom</button>
+                        <input type="number" id="b-custom-qty" placeholder="Qty" style="width: 80px; flex: 1 1 80px; box-sizing: border-box; padding:8px;" min="0.1" step="0.1">
+                        <button class="action-btn" style="background:#e67e22; flex: 1 1 120px;" onclick="addCustomLineItem()">Add Custom</button>
                     </div>
                 </div>
 
-                <table style="margin-bottom: 15px;"><thead><tr><th>Item</th><th>Qty</th><th>Client Price</th><th>Line Total</th></tr></thead><tbody id="b-lines"></tbody></table>
+                <div class="table-responsive">
+                    <table style="margin-bottom: 15px;"><thead><tr><th>Item</th><th>Qty</th><th>Client Price</th><th>Line Total</th></tr></thead><tbody id="b-lines"></tbody></table>
+                </div>
                 <h2 style="text-align: right; margin-bottom: 20px;">Total: $<span id="b-total">0.00</span></h2>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="resetBuilder()">Cancel</button> <button class="action-btn" style="background: #2e7d32;" onclick="saveDocument()">Save Document</button></div>
                 <p id="b-msg" style="text-align: right; margin-top: 10px;"></p>
@@ -233,43 +241,52 @@
             <div id="po-builder-box" class="builder-box" style="display: none; background: #e3f2fd; border-color: #90caf9;">
                 <h3 style="margin-bottom: 15px; color:#1565c0;">Build Independent Contractor PO</h3>
                 <p><strong>Client:</strong> <span id="po-client"></span> | <strong>Address:</strong> <span id="po-address"></span></p>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px; margin-top:15px;">
-                    <input type="text" id="po-ic-name" placeholder="Contractor Name *" style="flex:1; padding:8px;" required>
-                    <input type="email" id="po-ic-email" placeholder="Contractor Email" style="flex:1; padding:8px;">
-                    <input type="tel" id="po-ic-phone" placeholder="Contractor Phone" style="flex:1; padding:8px;">
-                    <input type="text" id="po-labor-type" placeholder="Labor Type" style="flex:1; padding:8px;">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; margin-top:15px; flex-wrap: wrap;">
+                    <input type="text" id="po-ic-name" placeholder="Contractor Name *" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;" required>
+                    <input type="email" id="po-ic-email" placeholder="Contractor Email" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
+                    <input type="tel" id="po-ic-phone" placeholder="Contractor Phone" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
+                    <input type="text" id="po-labor-type" placeholder="Labor Type" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;">
                 </div>
-                <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
-                <table style="margin-bottom: 15px; width: 100%;">
-                    <thead>
-                        <tr>
-                            <th style="width: 50%;">Item / Scope</th>
-                            <th style="width: 15%;">Qty</th>
-                            <th style="width: 15%;">Set Piece Rate ($)</th>
-                            <th style="width: 20%;">Total Payout</th>
-                        </tr>
-                    </thead>
-                    <tbody id="po-lines"></tbody>
-                </table>
+                <textarea id="po-comments" rows="2" placeholder="Instructions for Contractor..." style="width:100%; box-sizing: border-box; padding:8px; border:1px solid #ccc; border-radius:4px; margin-bottom:15px; font-family:sans-serif;"></textarea>
+                
+                <div class="table-responsive">
+                    <table style="margin-bottom: 15px; width: 100%;">
+                        <thead>
+                            <tr>
+                                <th style="width: 50%;">Item / Scope</th>
+                                <th style="width: 15%;">Qty</th>
+                                <th style="width: 15%;">Set Piece Rate ($)</th>
+                                <th style="width: 20%;">Total Payout</th>
+                            </tr>
+                        </thead>
+                        <tbody id="po-lines"></tbody>
+                    </table>
+                </div>
                 <h2 style="text-align: right; margin-bottom: 20px;">PO Total: $<span id="po-total">0.00</span></h2>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('po-builder-box').style.display='none'">Cancel</button> <button class="action-btn" style="background: #1565c0;" onclick="savePO()">Save PO</button></div>
             </div>
 
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px;">Invoices</h3>
-            <table><thead><tr><th>#</th><th>Client / PO</th><th>Address</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="invoices-table-body"></tbody></table>
+            <div class="table-responsive">
+                <table><thead><tr><th>#</th><th>Client / PO</th><th>Address</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="invoices-table-body"></tbody></table>
+            </div>
 
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px; margin-top:30px;">Estimates</h3>
-            <table><thead><tr><th>#</th><th>Client / PO</th><th>Project</th><th>Total</th><th>Action</th></tr></thead><tbody id="estimates-table-body"></tbody></table>
+            <div class="table-responsive">
+                <table><thead><tr><th>#</th><th>Client / PO</th><th>Project</th><th>Total</th><th>Action</th></tr></thead><tbody id="estimates-table-body"></tbody></table>
+            </div>
             
             <h3 style="margin-bottom: 10px; border-bottom: 2px solid #111; padding-bottom: 5px; margin-top:30px; color:#1565c0;">Purchase Orders (Contractors)</h3>
-            <table><thead><tr><th>PO #</th><th>Contractor</th><th>Client Ref</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="pos-table-body"></tbody></table>
+            <div class="table-responsive">
+                <table><thead><tr><th>PO #</th><th>Contractor</th><th>Client Ref</th><th>Total</th><th>Status</th><th>Action</th></tr></thead><tbody id="pos-table-body"></tbody></table>
+            </div>
         </div>
 
         <!-- TAB 3: PRICE SHEET -->
         <div id="tab-prices" class="tab-content">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
-                <h2>Itemized Price Sheet</h2>
-                <div style="display: flex; gap: 10px;">
+                <h2 style="margin: 0;">Itemized Price Sheet</h2>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="action-btn" style="background: #444;" onclick="printPriceSheet()">Print / PDF</button>
                     <button class="action-btn" style="background: #0288d1;" onclick="exportPriceSheetCSV()">Export CSV</button>
                     <button class="action-btn" onclick="document.getElementById('add-price-box').style.display='block'">+ Add New Item</button>
@@ -278,18 +295,24 @@
 
             <div id="add-price-box" class="builder-box" style="display: none; background: #e8f5e9; border-color: #a5d6a7;">
                 <h3 style="margin-bottom: 15px; color:#2e7d32;">Add New Price Sheet Item</h3>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="new-item-name" placeholder="Item Name" style="flex:2; padding:8px;" required>
-                    <input type="text" id="new-item-cat" list="price-categories" placeholder="Category" style="flex:1; padding:8px;" required>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <input type="text" id="new-item-name" placeholder="Item Name" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;" required>
+                    <input type="text" id="new-item-cat" list="price-categories" placeholder="Category" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;" required>
                     <datalist id="price-categories"><option value="Labor"><option value="Substrate & Backer"><option value="Setting Materials"><option value="Grout"><option value="Valves & Drains"><option value="Trims & Profiles"><option value="Fittings & Supplies"><option value="Installation Tools"></datalist>
                 </div>
-                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                    <input type="text" id="new-item-unit" placeholder="Cost Unit" style="flex:1; padding:8px;" required>
-                    <div style="display: flex; align-items: center; gap: 5px; flex:1;"><span style="font-weight:bold;">$</span><input type="number" id="new-item-price" step="0.01" placeholder="Base Cost (No Markup)" style="width:100%; padding:8px;" required></div>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <input type="text" id="new-item-unit" placeholder="Cost Unit" style="flex: 1 1 200px; width: 100%; box-sizing: border-box; padding:8px;" required>
+                    <div style="display: flex; align-items: center; gap: 5px; flex: 1 1 200px; width: 100%; box-sizing: border-box;">
+                        <span style="font-weight:bold;">$</span>
+                        <input type="number" id="new-item-price" step="0.01" placeholder="Base Cost (No Markup)" style="width:100%; box-sizing: border-box; padding:8px;" required>
+                    </div>
                 </div>
                 <div style="text-align: right;"><button class="action-btn" style="background: #666;" onclick="document.getElementById('add-price-box').style.display='none'">Cancel</button> <button class="action-btn" style="background: #2e7d32;" onclick="saveNewPrice()">Save Item</button></div>
             </div>
-            <table><thead><tr><th>Item Name</th><th>Category</th><th>Cost Unit</th><th>Base Cost ($)</th></tr></thead><tbody id="prices-table-body"><tr><td colspan="4">Loading price sheet...</td></tr></tbody></table>
+            
+            <div class="table-responsive">
+                <table><thead><tr><th>Item Name</th><th>Category</th><th>Cost Unit</th><th>Base Cost ($)</th></tr></thead><tbody id="prices-table-body"><tr><td colspan="4">Loading price sheet...</td></tr></tbody></table>
+            </div>
         </div>
 
         <!-- TAB 4: LOG EXPENSES -->
@@ -807,6 +830,7 @@
         } 
     }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
+    
     async function submitExpense(e) { 
         e.preventDefault(); 
         const btn = e.target.querySelector('button'); 
