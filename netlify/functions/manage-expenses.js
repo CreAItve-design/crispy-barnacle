@@ -1,11 +1,31 @@
 const { createClient } = require('@supabase/supabase-js');
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 exports.handler = async (event) => {
-    if (event.httpMethod !== 'POST') return { statusCode: 405 };
+    if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+
     try {
-        const { category, amount, description, vendor_name } = JSON.parse(event.body);
-        let finalAmount = category === 'Company Meals (50% Deductible)' ? parseFloat(amount) * 0.5 : parseFloat(amount);
-        const { error } = await supabase.from('expenses').insert([{ category, amount: finalAmount, description, vendor_name }]);
-        if (error) throw error; return { statusCode: 200, body: JSON.stringify({ success: true }) };
-    } catch (e) { return { statusCode: 500, body: JSON.stringify({ error: e.message }) }; }
+        const payload = JSON.parse(event.body);
+        
+        // Construct the expense object
+        const insertData = {
+            category: payload.category,
+            vendor_name: payload.vendor_name,
+            amount: parseFloat(payload.amount),
+            description: payload.description
+        };
+
+        // If a manual date was provided, convert it to a database-friendly timestamp
+        if (payload.created_at) {
+            insertData.created_at = new Date(payload.created_at).toISOString();
+        }
+
+        const { error } = await supabase.from('expenses').insert([insertData]);
+
+        if (error) throw error;
+        
+        return { statusCode: 200, body: JSON.stringify({ success: true }) };
+    } catch (error) {
+        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+    }
 };

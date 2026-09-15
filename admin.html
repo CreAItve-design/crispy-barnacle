@@ -228,6 +228,10 @@
             <h2>Record a Business Expense</h2>
             <form onsubmit="submitExpense(event)" style="max-width: 500px;">
                 <div class="form-group">
+                    <label style="font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; display: block;">Date of Expense:</label>
+                    <input type="date" id="exp-date" required>
+                </div>
+                <div class="form-group">
                     <select id="exp-category" required>
                         <option value="Materials (COGS)">Materials (COGS)</option>
                         <option value="Labor">Labor</option>
@@ -256,7 +260,17 @@
     let poDraftLines = []; let poDraftTotal = 0; let currentInvForPO = null; let editingPOId = null;
 
     async function handleLogin(e) { e.preventDefault(); const res = await fetch('/.netlify/functions/admin-auth', { method: 'POST', body: JSON.stringify({ password: document.getElementById('admin-pass').value }) }); if (res.ok) { sessionStorage.setItem('spotlight_admin', 'true'); document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } else { document.getElementById('login-error').innerText = 'Incorrect password.'; } }
-    window.onload = () => { if (sessionStorage.getItem('spotlight_admin') === 'true') { document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } };
+    
+    window.onload = () => { 
+        if (sessionStorage.getItem('spotlight_admin') === 'true') { 
+            document.getElementById('login-screen').style.display = 'none'; 
+            document.getElementById('dashboard-screen').style.display = 'block'; 
+            loadDashboardData(); 
+        } 
+        // Auto-fill today's date in the Log Expenses tab
+        document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+    };
+    
     function logout() { sessionStorage.removeItem('spotlight_admin'); location.reload(); }
     
     function switchTab(evt, tabId) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(tabId).classList.add('active'); evt.currentTarget.classList.add('active'); }
@@ -293,7 +307,7 @@
             const pnlRes = await fetch(pnlUrl);
             if (pnlRes.ok) {
                 const pnlData = await pnlRes.json();
-                window.currentPnLData = pnlData; // Save globally for clean PDF generation
+                window.currentPnLData = pnlData;
                 
                 document.getElementById('pnl-revenue').innerText = `$${pnlData.totalRevenue.toFixed(2)}`;
                 document.getElementById('pnl-expenses').innerText = `$${pnlData.totalExpenses.toFixed(2)}`;
@@ -622,18 +636,34 @@
         } 
     }
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
+    
     async function submitExpense(e) { 
         e.preventDefault(); 
-        const btn = e.target.querySelector('button'); btn.innerText = 'Saving...'; 
+        const btn = e.target.querySelector('button'); 
+        btn.innerText = 'Saving...'; 
         try { 
-            await fetch('/.netlify/functions/manage-expenses', { method: 'POST', body: JSON.stringify({ category: document.getElementById('exp-category').value, vendor_name: document.getElementById('exp-vendor').value, amount: document.getElementById('exp-amount').value, description: document.getElementById('exp-desc').value }) }); 
+            await fetch('/.netlify/functions/manage-expenses', { 
+                method: 'POST', 
+                body: JSON.stringify({ 
+                    created_at: document.getElementById('exp-date').value,
+                    category: document.getElementById('exp-category').value, 
+                    vendor_name: document.getElementById('exp-vendor').value, 
+                    amount: document.getElementById('exp-amount').value, 
+                    description: document.getElementById('exp-desc').value 
+                }) 
+            }); 
             ['exp-amount', 'exp-desc', 'exp-vendor'].forEach(id => document.getElementById(id).value = ''); 
+            // Reset the date field back to today after saving
+            document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
             loadDashboardData(); 
-            btn.innerText = 'Save Expense'; alert('Expense logged successfully!'); 
+            btn.innerText = 'Save Expense'; 
+            alert('Expense logged successfully!'); 
         } catch(err) { 
-            alert('Error saving expense.'); btn.innerText = 'Save Expense'; 
+            alert('Error saving expense.'); 
+            btn.innerText = 'Save Expense'; 
         } 
     }
+    
     async function sendInvoice(id) { if (confirm('Email Invoice?')) { alert('Sending...'); await fetch('/.netlify/functions/send-invoice', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
     async function sendEstimate(id) { if (confirm('Email Estimate?')) { alert('Sending...'); await fetch('/.netlify/functions/send-estimate', { method: 'POST', body: JSON.stringify({ id }) }); alert('Sent!'); loadDashboardData(); } }
 
