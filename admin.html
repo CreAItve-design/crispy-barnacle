@@ -28,7 +28,11 @@
         .toolbar { display: flex; gap: 15px; align-items: center; background: #fafafa; padding: 15px; border-radius: 6px; border: 1px solid #e5e5e5; margin-bottom: 20px; flex-wrap: wrap; }
         .flag-box { background: #ffebee; border: 1px solid #ffcdd2; color: #c62828; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: none; font-weight: bold; }
         
-        /* Strict PDF Print Layout Rules */
+        /* Rapid Estimator Toggles */
+        .toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .toggle-btn { background: #fff; border: 1px solid #ccc; padding: 12px; border-radius: 6px; text-align: center; cursor: pointer; font-weight: bold; color: #666; transition: 0.2s; }
+        .toggle-btn.active { background: #e3f2fd; border-color: #1565c0; color: #1565c0; }
+        
         @media print {
             @page { size: letter portrait; margin: 0.5in; }
             body.admin-body { background: white !important; padding: 0 !important; margin: 0 !important; }
@@ -57,14 +61,69 @@
         </div>
 
         <div class="admin-tabs">
-            <button class="tab-btn active" onclick="switchTab(event, 'tab-pnl')">P&L & Reports</button>
+            <button class="tab-btn active" onclick="switchTab(event, 'tab-rapid')">Rapid Estimator</button>
+            <button class="tab-btn" onclick="switchTab(event, 'tab-pnl')">P&L & Reports</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-estimates')">Documents & POs</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-prices')">Price Sheet</button>
             <button class="tab-btn" onclick="switchTab(event, 'tab-expenses')">Log Expenses</button>
         </div>
 
+        <!-- NEW TAB: RAPID ESTIMATOR -->
+        <div id="tab-rapid" class="tab-content active">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h2>In-Field Consultation Tool</h2>
+                <h1 id="live-est-display" style="color: #2e7d32; margin: 0;">$0 - $0</h1>
+            </div>
+            <p style="color: #666; margin-bottom: 20px;">Provide instant rough numbers to clients and save photos to the database for later.</p>
+
+            <div class="builder-box">
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="rapid-client" placeholder="Prospect Name *" style="flex:1; padding:12px; font-size: 1.1rem;" required>
+                    <input type="tel" id="rapid-phone" placeholder="Phone Number" style="flex:1; padding:12px; font-size: 1.1rem;">
+                </div>
+                
+                <div class="form-group">
+                    <select id="rapid-type" style="padding:12px; font-size: 1.1rem; font-weight: bold;" onchange="calculateRapidEst()">
+                        <option value="Shower Build">Custom Shower Build</option>
+                        <option value="Tub Surround">Bathtub Surround</option>
+                        <option value="Floor Installation">Floor Installation</option>
+                        <option value="Kitchen Backsplash">Kitchen Backsplash</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                    <strong style="width: 120px;">Rough Sq Ft:</strong>
+                    <input type="number" id="rapid-sqft" value="80" style="padding:12px; width: 100px; font-size: 1.1rem;" oninput="calculateRapidEst()">
+                </div>
+
+                <div class="toggle-grid">
+                    <div class="toggle-btn active" id="tog-demo" onclick="toggleBtn(this); calculateRapidEst()">Includes Demo</div>
+                    <div class="toggle-btn active" id="tog-water" onclick="toggleBtn(this); calculateRapidEst()">Waterproofing</div>
+                    <div class="toggle-btn" id="tog-niche" onclick="toggleBtn(this); calculateRapidEst()">Add Niche (x1)</div>
+                    <div class="toggle-btn active" id="tog-trash" onclick="toggleBtn(this); calculateRapidEst()">Trash / Bagster ($270)</div>
+                </div>
+
+                <textarea id="rapid-notes" rows="3" placeholder="Consultation Notes (Preferences, conditions, etc.)..." style="width:100%; padding:10px; font-family:sans-serif; margin-bottom: 15px;"></textarea>
+                
+                <div style="background: #fff; padding: 15px; border-radius: 6px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong style="display: block; margin-bottom: 5px;">Take Project Photo</strong>
+                        <input type="file" accept="image/*" capture="environment" id="rapid-photo" style="font-size: 0.9rem;">
+                    </div>
+                    <button class="action-btn" style="background: #e65100; padding: 12px 25px; font-size: 1rem;" onclick="saveRapidProspect(this)">Save Prospect</button>
+                </div>
+                <p id="rapid-msg" style="text-align: right; color: #2e7d32; font-weight: bold; margin-top: 10px;"></p>
+            </div>
+            
+            <h3 style="border-bottom: 2px solid #111; padding-bottom: 5px;">Recent Prospects</h3>
+            <table>
+                <thead><tr><th>Date</th><th>Prospect</th><th>Project</th><th>Est. Range</th></tr></thead>
+                <tbody id="prospects-table-body"><tr><td colspan="4">Loading prospects...</td></tr></tbody>
+            </table>
+        </div>
+
         <!-- TAB 1: P&L SUMMARY -->
-        <div id="tab-pnl" class="tab-content active">
+        <div id="tab-pnl" class="tab-content">
             <h2>Financial Reports</h2>
             <div id="1099-flags" class="flag-box"></div>
             
@@ -255,7 +314,7 @@
     </div>
 
 <script>
-    let globalPrices = []; let globalClients = []; let globalInvoices = []; let globalEstimates = []; let globalPOs = [];
+    let globalPrices = []; let globalClients = []; let globalInvoices = []; let globalEstimates = []; let globalPOs = []; let globalProspects = [];
     let draftLines = []; let draftTotal = 0; let editingDocId = null; let editingDocType = null;
     let poDraftLines = []; let poDraftTotal = 0; let currentInvForPO = null; let editingPOId = null;
 
@@ -264,15 +323,100 @@
         const img = new Image(); img.src = 'https://spotlight-tile.com/image.png';
         if (sessionStorage.getItem('spotlight_admin') === 'true') { document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } 
         document.getElementById('exp-date').value = new Date().toISOString().split('T')[0];
+        calculateRapidEst(); // Initialize UI
     };
 
     async function handleLogin(e) { e.preventDefault(); const res = await fetch('/.netlify/functions/admin-auth', { method: 'POST', body: JSON.stringify({ password: document.getElementById('admin-pass').value }) }); if (res.ok) { sessionStorage.setItem('spotlight_admin', 'true'); document.getElementById('login-screen').style.display = 'none'; document.getElementById('dashboard-screen').style.display = 'block'; loadDashboardData(); } else { document.getElementById('login-error').innerText = 'Incorrect password.'; } }
-    
     function logout() { sessionStorage.removeItem('spotlight_admin'); location.reload(); }
     
     function switchTab(evt, tabId) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(tabId).classList.add('active'); evt.currentTarget.classList.add('active'); }
     function toggleDeposit(type) { document.getElementById('deposit-container').style.display = type === 'Invoice' ? 'flex' : 'none'; }
     document.getElementById('b-name').addEventListener('input', function(e) { const selected = globalClients.find(c => c.name === e.target.value); if (selected) document.getElementById('b-email').value = selected.email || ''; });
+
+    // --- RAPID ESTIMATOR LOGIC ---
+    function toggleBtn(el) { el.classList.toggle('active'); }
+    
+    function calculateRapidEst() {
+        const sqft = parseFloat(document.getElementById('rapid-sqft').value) || 0;
+        const type = document.getElementById('rapid-type').value;
+        const hasDemo = document.getElementById('tog-demo').classList.contains('active');
+        const hasWater = document.getElementById('tog-water').classList.contains('active');
+        const hasNiche = document.getElementById('tog-niche').classList.contains('active');
+        const hasTrash = document.getElementById('tog-trash').classList.contains('active');
+
+        // Rough Field Math Rules
+        // Standard baseline: Labor ~$18/sf, Underlayment/Thinest ~$12/sf = $30/sf avg.
+        let baseCost = sqft * 30; 
+        
+        if (type === 'Shower Build') baseCost += 1500; // Pan/Curb/Drain extra labor
+        if (type === 'Tub Surround') baseCost += 600;  // Tub flange prep
+        if (type === 'Kitchen Backsplash') baseCost = sqft * 35; // Detail work higher $/sf
+        
+        if (hasDemo) baseCost += (sqft * 8) + 200; // Demo labor buffer
+        if (hasWater) baseCost += 150;
+        if (hasNiche) baseCost += 250;
+        if (hasTrash) baseCost += 270;
+
+        // Give a safe -5% to +15% range for the field
+        const low = Math.floor(baseCost * 0.95 / 50) * 50; 
+        const high = Math.ceil(baseCost * 1.15 / 50) * 50;
+        
+        document.getElementById('live-est-display').innerText = `$${low.toLocaleString()} - $${high.toLocaleString()}`;
+    }
+
+    async function compressPhoto(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = event => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; // Compress heavily for fast database storage
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.7)); 
+                }
+            }
+        });
+    }
+
+    async function saveRapidProspect(btn) {
+        const name = document.getElementById('rapid-client').value;
+        if (!name) return alert("Please enter a prospect name.");
+        
+        btn.innerText = "Saving...";
+        const fileInput = document.getElementById('rapid-photo');
+        let compressedPhoto = '';
+        if (fileInput.files.length > 0) {
+            compressedPhoto = await compressPhoto(fileInput.files[0]);
+        }
+
+        const range = document.getElementById('live-est-display').innerText.replace(/\$/g, '').replace(/,/g, '').split(' - ');
+
+        const payload = {
+            client_name: name,
+            phone: document.getElementById('rapid-phone').value,
+            project_type: document.getElementById('rapid-type').value,
+            estimated_min: parseFloat(range[0]),
+            estimated_max: parseFloat(range[1]),
+            notes: document.getElementById('rapid-notes').value,
+            photo_data: compressedPhoto
+        };
+
+        try {
+            const res = await fetch('/.netlify/functions/save-prospect', { method: 'POST', body: JSON.stringify(payload) });
+            if (res.ok) {
+                document.getElementById('rapid-msg').innerText = "Prospect Saved!";
+                ['rapid-client', 'rapid-phone', 'rapid-notes'].forEach(id => document.getElementById(id).value = '');
+                document.getElementById('rapid-photo').value = '';
+                setTimeout(() => { document.getElementById('rapid-msg').innerText = ''; btn.innerText = "Save Prospect"; }, 3000);
+            } else { alert("Failed to save."); btn.innerText = "Save Prospect"; }
+        } catch (e) { alert("Connection Error."); btn.innerText = "Save Prospect"; }
+    }
 
     async function loadDashboardData() {
         try {
