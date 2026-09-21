@@ -483,7 +483,12 @@
             globalPrices.forEach(item => {
                 const isArchived = item.item_name.includes('(Archived)');
                 const safeName = item.item_name.replace(/'/g, "\\'"); 
-                const editBtn = isArchived ? '' : `<button onclick="editPrice(${item.id}, '${safeName}', ${item.unit_price})" style="float:right; background:#444; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Update Rate</button>`;
+                
+                const deleteBtn = `<button onclick="deletePrice(${item.id})" style="float:right; background:#c62828; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Delete</button>`;
+                const editBtn = isArchived 
+                    ? deleteBtn 
+                    : `<button onclick="editPrice(${item.id}, '${safeName}', ${item.unit_price})" style="float:right; background:#444; color:#fff; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; margin-left: 5px;">Update Rate</button> ` + deleteBtn;
+                
                 const rowStyle = isArchived ? 'color: #888; background: #f9f9f9;' : '';
                 
                 priceBody.innerHTML += `<tr style="${rowStyle}"><td>${item.item_name}</td><td>${item.category}</td><td>${item.unit}</td><td>$${item.unit_price} ${editBtn}</td></tr>`;
@@ -776,9 +781,29 @@
         draftLines.forEach((item, index) => {
             draftTotal += item.line_total;
             const costDisplay = item.base_cost < item.unit_price ? `<br><small style="color:#2e7d32;">Cost: $${item.base_cost.toFixed(2)} (+Markup)</small>` : '';
-            tbody.innerHTML += `<tr><td>${item.item_name} ${costDisplay}</td><td>${item.qty}</td><td>$${item.unit_price.toFixed(2)}</td><td>$${item.line_total.toFixed(2)} <button onclick="removeLine(${index})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer;">✖</button></td></tr>`;
+            
+            // Allow saving ANY line item to the master price sheet retroactively
+            const saveToSheetBtn = `<br><button onclick="savePastCustomItem('${item.item_name.replace(/'/g, "\\'")}', '${item.category || 'Custom / Special'}', ${item.unit_price})" style="background:#0288d1; color:#fff; border:none; padding:3px 6px; border-radius:3px; font-size:0.75rem; cursor:pointer; margin-top:4px;">+ Save to Master Price Sheet</button>`;
+            
+            tbody.innerHTML += `<tr><td>${item.item_name} ${costDisplay} ${saveToSheetBtn}</td><td>${item.qty}</td><td>$${item.unit_price.toFixed(2)}</td><td>$${item.line_total.toFixed(2)} <button onclick="removeLine(${index})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer;">✖</button></td></tr>`;
         });
         document.getElementById('b-total').innerText = draftTotal.toFixed(2);
+    }
+    
+    async function savePastCustomItem(name, category, price) {
+        if(!confirm(`Save "${name}" to your Master Price Sheet for $${price}?`)) return;
+        try { 
+            const res = await fetch('/.netlify/functions/add-price', { 
+                method: 'POST', 
+                body: JSON.stringify({ item_name: name, category: category, unit: "Custom", unit_price: price }) 
+            }); 
+            if(res.ok) {
+                alert("Successfully saved to Price Sheet!");
+                loadDashboardData();
+            } else {
+                alert("Failed to save.");
+            }
+        } catch (e) { alert("Connection Error."); }
     }
 
     function addLineItem() {
@@ -807,7 +832,7 @@
                     method: 'POST', 
                     body: JSON.stringify({ item_name: name, category: "Custom / Special", unit: "Custom", unit_price: price }) 
                 }); 
-                loadDashboardData(); // Quietly refresh dropdowns behind the scenes
+                loadDashboardData(); 
             } catch (e) { console.error('Failed to save to price sheet', e); }
         }
         
@@ -829,6 +854,7 @@
         
         if (docType === 'Estimate') {
             payload.project_type = document.getElementById('b-project').value;
+            delete payload.deposit_paid; // FIX FOR "DEPOSIT_PAID DOES NOT EXIST" ERROR ON ESTIMATES
         } else {
             payload.deposit_paid = parseFloat(document.getElementById('b-deposit').value || 0);
         }
@@ -851,6 +877,7 @@
 
     // --- UTILS & PRINTING ---
     async function deleteDoc(id, docType) { if (confirm(`Delete ${docType}?`)) { await fetch(docType === 'Estimate' ? '/.netlify/functions/create-estimate' : '/.netlify/functions/manage-invoices', { method: 'DELETE', body: JSON.stringify({ id }) }); loadDashboardData(); } }
+    
     async function editPrice(id, name, currentPrice) { 
         const newPrice = prompt(`Base Cost for ${name}:`, currentPrice); 
         if (newPrice) { 
@@ -858,6 +885,16 @@
             loadDashboardData(); 
         } 
     }
+    
+    async function deletePrice(id) { 
+        if (confirm("Are you sure you want to permanently delete this item from your Price Sheet?")) { 
+            try {
+                await fetch('/.netlify/functions/delete-price', { method: 'POST', body: JSON.stringify({ id }) }); 
+                loadDashboardData(); 
+            } catch (e) { alert("Failed to delete price."); }
+        } 
+    }
+    
     async function markInvoicePaid(id) { await fetch('/.netlify/functions/manage-invoices', { method: 'PUT', body: JSON.stringify({ id, status: 'Paid' }) }); loadDashboardData(); }
     
     async function submitExpense(e) { 
