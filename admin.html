@@ -227,6 +227,9 @@
                         <input type="number" id="b-custom-qty" placeholder="Qty" style="width: 80px; flex: 1 1 80px; box-sizing: border-box; padding:8px;" min="0.1" step="0.1">
                         <button class="action-btn" style="background:#e67e22; flex: 1 1 120px;" onclick="addCustomLineItem()">Add Custom</button>
                     </div>
+                    <div style="text-align: right; margin-top: 10px;">
+                        <label style="font-size: 0.85rem; color: #555; cursor: pointer; font-weight: bold;"><input type="checkbox" id="b-custom-save-check" style="width: auto; display: inline-block;"> Save this item to Master Price Sheet</label>
+                    </div>
                 </div>
 
                 <div class="table-responsive">
@@ -788,11 +791,31 @@
         renderDraftLines();
     }
     
-    function addCustomLineItem() {
-        const name = document.getElementById('b-custom-name').value; const price = parseFloat(document.getElementById('b-custom-price').value); const qty = parseFloat(document.getElementById('b-custom-qty').value);
+    async function addCustomLineItem() {
+        const name = document.getElementById('b-custom-name').value; 
+        const price = parseFloat(document.getElementById('b-custom-price').value); 
+        const qty = parseFloat(document.getElementById('b-custom-qty').value);
+        const saveToSheet = document.getElementById('b-custom-save-check') ? document.getElementById('b-custom-save-check').checked : false;
+        
         if (!name || isNaN(price) || isNaN(qty) || qty <= 0) return alert("Please enter a custom name, price, and valid quantity.");
+        
         draftLines.push({ item_name: name, category: "Custom / Special", qty: qty, base_cost: price, unit_price: price, line_total: price * qty });
-        document.getElementById('b-custom-name').value = ''; document.getElementById('b-custom-price').value = ''; document.getElementById('b-custom-qty').value = ''; renderDraftLines();
+        
+        if (saveToSheet) {
+            try { 
+                await fetch('/.netlify/functions/add-price', { 
+                    method: 'POST', 
+                    body: JSON.stringify({ item_name: name, category: "Custom / Special", unit: "Custom", unit_price: price }) 
+                }); 
+                loadDashboardData(); // Quietly refresh dropdowns behind the scenes
+            } catch (e) { console.error('Failed to save to price sheet', e); }
+        }
+        
+        document.getElementById('b-custom-name').value = ''; 
+        document.getElementById('b-custom-price').value = ''; 
+        document.getElementById('b-custom-qty').value = ''; 
+        if(document.getElementById('b-custom-save-check')) document.getElementById('b-custom-save-check').checked = false;
+        renderDraftLines();
     }
     
     function removeLine(index) { draftLines.splice(index, 1); renderDraftLines(); }
@@ -802,11 +825,12 @@
         if (!client_name || draftLines.length === 0) return alert('Name and at least one line item required.');
         const msg = document.getElementById('b-msg'); msg.style.color = '#111'; msg.innerText = 'Saving...';
         
-        const payload = { client_name: client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, client_address: document.getElementById('b-address').value, comments: document.getElementById('b-comments').value, po_job_name: document.getElementById('b-po').value, deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), itemized_lines: draftLines, total_amount: draftTotal };
+        const payload = { client_name: client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, client_address: document.getElementById('b-address').value, comments: document.getElementById('b-comments').value, po_job_name: document.getElementById('b-po').value, itemized_lines: draftLines, total_amount: draftTotal };
         
         if (docType === 'Estimate') {
             payload.project_type = document.getElementById('b-project').value;
-            delete payload.deposit_paid;
+        } else {
+            payload.deposit_paid = parseFloat(document.getElementById('b-deposit').value || 0);
         }
         
         if (editingDocId) payload.id = editingDocId;
