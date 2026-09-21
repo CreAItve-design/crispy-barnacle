@@ -328,14 +328,14 @@
                         <option value="Materials (COGS)">Materials (COGS)</option>
                         <option value="Labor">Labor</option>
                         <option value="Job Supplies">Job Supplies</option>
-                        <option value="Subcontractors (1099)">Subcontractors (1099)</option>
+                        <option value="Subcontractors">Subcontractors (1099 / IC)</option>
                         <option value="Owner's Pay">Owner's Pay / Payroll</option>
                         <option value="Office Expenses">Office Expenses</option>
-                        <option value="Company Meals (50% Deductible)">Meals (50% Deductible)</option>
+                        <option value="Meals">Company Meals</option>
                         <option value="Fees and Services">Fees and Services</option>
                         <option value="Maintenance / Repairs">Maintenance / Repairs</option>
                         <option value="Tools / Equipment">Tools / Equipment</option>
-                        <option value="Other / Miscellaneous">Other / Miscellaneous</option>
+                        <option value="Other">Other / Miscellaneous</option>
                     </select>
                 </div>
                 <div class="form-group"><input type="text" id="exp-vendor" placeholder="Vendor / Contractor Name (For 1099 Tracking)"></div>
@@ -803,7 +803,12 @@
         const msg = document.getElementById('b-msg'); msg.style.color = '#111'; msg.innerText = 'Saving...';
         
         const payload = { client_name: client_name, client_email: document.getElementById('b-email').value, client_phone: document.getElementById('b-phone').value, client_address: document.getElementById('b-address').value, comments: document.getElementById('b-comments').value, po_job_name: document.getElementById('b-po').value, deposit_paid: parseFloat(document.getElementById('b-deposit').value || 0), itemized_lines: draftLines, total_amount: draftTotal };
-        if (docType === 'Estimate') payload.project_type = document.getElementById('b-project').value;
+        
+        if (docType === 'Estimate') {
+            payload.project_type = document.getElementById('b-project').value;
+            delete payload.deposit_paid;
+        }
+        
         if (editingDocId) payload.id = editingDocId;
         
         try {
