@@ -353,6 +353,9 @@
     let globalPrices = []; let globalClients = []; let globalInvoices = []; let globalEstimates = []; let globalPOs = []; let globalProspects = [];
     let draftLines = []; let draftTotal = 0; let editingDocId = null; let editingDocType = null;
     let poDraftLines = []; let poDraftTotal = 0; let currentInvForPO = null; let editingPOId = null;
+    
+    // NEW: Master Client Directory for Autofill
+    let allKnownClients = {}; 
 
     // PRELOAD LOGO SO IT PRINTS INSTANTLY
     window.onload = () => { 
@@ -367,7 +370,16 @@
     
     function switchTab(evt, tabId) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById(tabId).classList.add('active'); evt.currentTarget.classList.add('active'); }
     function toggleDeposit(type) { document.getElementById('deposit-container').style.display = type === 'Invoice' ? 'flex' : 'none'; }
-    document.getElementById('b-name').addEventListener('input', function(e) { const selected = globalClients.find(c => c.name === e.target.value); if (selected) document.getElementById('b-email').value = selected.email || ''; });
+    
+    // SMART AUTOFILL: Fills all client details immediately upon name selection
+    document.getElementById('b-name').addEventListener('input', function(e) { 
+        const selected = allKnownClients[e.target.value]; 
+        if (selected) {
+            if (selected.email) document.getElementById('b-email').value = selected.email;
+            if (selected.phone) document.getElementById('b-phone').value = selected.phone;
+            if (selected.address) document.getElementById('b-address').value = selected.address;
+        }
+    });
 
     // --- RAPID ESTIMATOR LOGIC ---
     function toggleBtn(el) { el.classList.toggle('active'); }
@@ -473,6 +485,35 @@
             } else { alert("Failed to save."); btn.innerText = "Save Prospect"; }
         } catch (e) { alert("Connection Error."); btn.innerText = "Save Prospect"; }
     }
+    
+    function buildClientDirectory() {
+        allKnownClients = {};
+        // Aggregate every client from past documents to power the smart auto-fill
+        globalClients.forEach(c => {
+            if(c.name) allKnownClients[c.name] = { name: c.name, email: c.email || '', phone: c.phone || '', address: c.address || '' };
+        });
+        globalEstimates.forEach(est => {
+            if(est.client_name) {
+                allKnownClients[est.client_name] = { 
+                    name: est.client_name, 
+                    email: est.client_email || (allKnownClients[est.client_name] ? allKnownClients[est.client_name].email : ''), 
+                    phone: est.client_phone || (allKnownClients[est.client_name] ? allKnownClients[est.client_name].phone : ''), 
+                    address: est.client_address || (allKnownClients[est.client_name] ? allKnownClients[est.client_name].address : '') 
+                };
+            }
+        });
+        globalInvoices.forEach(inv => {
+            if(inv.client_name) {
+                allKnownClients[inv.client_name] = { 
+                    name: inv.client_name, 
+                    email: inv.client_email || (allKnownClients[inv.client_name] ? allKnownClients[inv.client_name].email : ''), 
+                    phone: inv.client_phone || (allKnownClients[inv.client_name] ? allKnownClients[inv.client_name].phone : ''), 
+                    address: inv.client_address || (allKnownClients[inv.client_name] ? allKnownClients[inv.client_name].address : '') 
+                };
+            }
+        });
+        document.getElementById('saved-clients').innerHTML = Object.values(allKnownClients).map(c => `<option value="${c.name}">`).join('');
+    }
 
     async function loadDashboardData() {
         try {
@@ -501,7 +542,7 @@
 
         try {
             const clientRes = await fetch('/.netlify/functions/get-clients');
-            if (clientRes.ok) { globalClients = await clientRes.json(); document.getElementById('saved-clients').innerHTML = globalClients.map(c => `<option value="${c.name}">`).join(''); }
+            if (clientRes.ok) globalClients = await clientRes.json();
             
             let pnlUrl = '/.netlify/functions/reports-pnl';
             if (document.getElementById('pnl-start').value || document.getElementById('pnl-end').value) pnlUrl += `?startDate=${document.getElementById('pnl-start').value}&endDate=${document.getElementById('pnl-end').value}`;
@@ -546,6 +587,7 @@
                         <td>${actionBtn}<div style="display:flex; gap:4px; margin-top:5px; flex-wrap:wrap;">
                             <button onclick="printDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#444;">PDF</button> 
                             <button onclick="editDocument(${inv.id}, 'Invoice')" class="action-btn" style="background:#f39c12;">Edit</button> 
+                            <button onclick="duplicateDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#8e44ad;">Copy</button> 
                             <button onclick="openPOBuilder(${inv.id})" class="action-btn" style="background:#1565c0;">Build PO</button>
                             <button onclick="sendInvoice(${inv.id})" class="action-btn" style="background:#0288d1;">Send</button>
                             <button onclick="deleteDoc(${inv.id}, 'Invoice')" class="action-btn" style="background:#c62828;">Del</button>
@@ -564,6 +606,7 @@
                         <td><div style="display:flex; gap:4px; flex-wrap:wrap;">
                             <button onclick="printDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#444;">PDF</button> 
                             <button onclick="editDocument(${est.id}, 'Estimate')" class="action-btn" style="background:#f39c12;">Edit</button> 
+                            <button onclick="duplicateDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#8e44ad;">Copy</button> 
                             <button onclick="sendEstimate(${est.id})" class="action-btn" style="background:#0288d1;">Send</button>
                             <button onclick="deleteDoc(${est.id}, 'Estimate')" class="action-btn" style="background:#c62828;">Del</button>
                         </div></td></tr>`;
@@ -590,6 +633,10 @@
                     </tr>`;
                 });
             }
+            
+            // Build the Smart Autofill Directory now that all data is loaded
+            buildClientDirectory();
+            
         } catch(e) {}
     }
 
@@ -771,9 +818,43 @@
         if (!doc) return;
         editingDocId = id; editingDocType = docType; document.getElementById('builder-box').style.display = 'block'; document.getElementById('po-builder-box').style.display = 'none';
         document.querySelector(`input[name="doc_type"][value="${docType}"]`).checked = true; toggleDeposit(docType);
-        document.getElementById('b-name').value = doc.client_name || ''; document.getElementById('b-email').value = doc.client_email || ''; document.getElementById('b-phone').value = doc.client_phone || '';
-        document.getElementById('b-address').value = doc.client_address || ''; document.getElementById('b-comments').value = doc.comments || ''; document.getElementById('b-project').value = doc.project_type || ''; document.getElementById('b-po').value = doc.po_job_name || ''; document.getElementById('b-deposit').value = doc.deposit_paid || '0';
+        
+        document.getElementById('b-name').value = doc.client_name || ''; 
+        document.getElementById('b-email').value = doc.client_email || ''; 
+        document.getElementById('b-phone').value = doc.client_phone || '';
+        document.getElementById('b-address').value = doc.client_address || ''; 
+        document.getElementById('b-comments').value = doc.comments || ''; 
+        document.getElementById('b-project').value = doc.project_type || ''; 
+        document.getElementById('b-po').value = doc.po_job_name || ''; 
+        document.getElementById('b-deposit').value = doc.deposit_paid || '0';
+        
         draftLines = [...doc.itemized_lines]; renderDraftLines(); window.scrollTo({ top: document.getElementById('builder-box').offsetTop - 20, behavior: 'smooth' });
+    }
+    
+    function duplicateDoc(id, docType) {
+        const doc = docType === 'Invoice' ? globalInvoices.find(i => i.id === id) : globalEstimates.find(e => e.id === id);
+        if (!doc) return;
+        
+        resetBuilder(); // Clears everything and ensures editingDocId is null (saving as a NEW document)
+        
+        document.getElementById('builder-box').style.display = 'block'; 
+        document.getElementById('po-builder-box').style.display = 'none';
+        document.querySelector(`input[name="doc_type"][value="${docType}"]`).checked = true; 
+        toggleDeposit(docType);
+        
+        document.getElementById('b-name').value = doc.client_name || ''; 
+        document.getElementById('b-email').value = doc.client_email || ''; 
+        document.getElementById('b-phone').value = doc.client_phone || '';
+        document.getElementById('b-address').value = doc.client_address || ''; 
+        document.getElementById('b-comments').value = doc.comments || ''; 
+        if(docType === 'Estimate') document.getElementById('b-project').value = doc.project_type || ''; 
+        document.getElementById('b-po').value = doc.po_job_name || ''; 
+        document.getElementById('b-deposit').value = '0'; // Don't copy deposits for fresh clones
+        
+        // Deep copy lines so we don't accidentally mutate the original doc before saving
+        draftLines = JSON.parse(JSON.stringify(doc.itemized_lines)); 
+        renderDraftLines(); 
+        window.scrollTo({ top: document.getElementById('builder-box').offsetTop - 20, behavior: 'smooth' });
     }
 
     function renderDraftLines() {
@@ -782,7 +863,6 @@
             draftTotal += item.line_total;
             const costDisplay = item.base_cost < item.unit_price ? `<br><small style="color:#2e7d32;">Cost: $${item.base_cost.toFixed(2)} (+Markup)</small>` : '';
             
-            // Allow saving ANY line item to the master price sheet retroactively
             const saveToSheetBtn = `<br><button onclick="savePastCustomItem('${item.item_name.replace(/'/g, "\\'")}', '${item.category || 'Custom / Special'}', ${item.unit_price})" style="background:#0288d1; color:#fff; border:none; padding:3px 6px; border-radius:3px; font-size:0.75rem; cursor:pointer; margin-top:4px;">+ Save to Master Price Sheet</button>`;
             
             tbody.innerHTML += `<tr><td>${item.item_name} ${costDisplay} ${saveToSheetBtn}</td><td>${item.qty}</td><td>$${item.unit_price.toFixed(2)}</td><td>$${item.line_total.toFixed(2)} <button onclick="removeLine(${index})" style="color:#c62828; font-weight:bold; background:none; border:none; cursor:pointer;">✖</button></td></tr>`;
@@ -854,7 +934,7 @@
         
         if (docType === 'Estimate') {
             payload.project_type = document.getElementById('b-project').value;
-            delete payload.deposit_paid; // FIX FOR "DEPOSIT_PAID DOES NOT EXIST" ERROR ON ESTIMATES
+            delete payload.deposit_paid; 
         } else {
             payload.deposit_paid = parseFloat(document.getElementById('b-deposit').value || 0);
         }
